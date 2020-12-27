@@ -23,6 +23,10 @@ type LocalClient struct {
 
 var PhysIntfRegex = regexp.MustCompile("^eth[0-9]+$")
 
+func (c *LocalClient) Close() error {
+	return c.api.Close()
+}
+
 func (c *LocalClient) connect() (*talosclient.Client, error) {
 	cfg, err := talosconfig.Open(c.configPath)
 	if err != nil {

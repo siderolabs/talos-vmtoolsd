@@ -35,6 +35,11 @@ func main() {
 	if err != nil {
 		l.Fatalf("error: could not connect to apid: %v", err)
 	}
+	defer func() {
+		if err := api.Close(); err != nil {
+			log.Printf("warning: failed to close API client during process shutdown: %v", err)
+		}
+	}()
 	tboxcmds.RegisterGuestInfoCommands(svc, api)
 	tboxcmds.RegisterPowerDelegate(svc, api)
 	tboxcmds.RegisterVixCommand(svc, api)
