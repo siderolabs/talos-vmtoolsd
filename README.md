@@ -6,7 +6,7 @@
 
 **A VMware tools implementation for the Talos Kubernetes platform, using govmomi and Talos' apid**
 
-[Talos](https://talos.dev/) ships as OVA file for VMware platforms, but by design lacks first-party hypervisor integration packages. Start/stop buttons for Talos nodes will not function and VM details are not available in vCenter.
+[Talos](https://talos.dev/) ships as OVA file for VMware platforms, but by design lacks first-party hypervisor integration packages. Restart/stop buttons for Talos nodes will not function and VM details are not available in vCenter.
 
 Deploying this program on your Talos environment provides native integration of Talos with vSphere/vCenter.
 
@@ -29,7 +29,7 @@ kubectl apply -f https://raw.githubusercontent.com/mologie/talos-vmtoolsd/master
 
 # Roadmap
 
-* [x] Feature-complete integration of Talos apid and ESXi (start/stop, IP, DNS, heartbeats)
+* [x] Feature-complete integration of Talos apid and ESXi (restart/stop, IP, DNS, heartbeats)
 * [x] Continuous Integration & Deployment via GitHub Actions
 * [ ] Stability testing and approval by the Talos community
 * [ ] Unit testing beyond govmomi-provided tests
