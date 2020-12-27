@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    app: talos-vmtoolsd
+  name: talos-vmtoolsd
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: talos-vmtoolsd
+  template:
+    metadata:
+      labels:
+        app: talos-vmtoolsd
+    spec:
+      priorityClassName: system-node-critical
+      restartPolicy: Always
+      tolerations:
+        - key: node.cloudprovider.kubernetes.io/uninitialized
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+          effect: NoSchedule
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - image: ghcr.io/mologie/talos-vmtoolsd-unstable:latest
+          name: talos-vmtoolsd
+          volumeMounts:
+            - name: config
+              mountPath: /etc/talos-vmtoolsd
+          env:
+            - name: TALOS_CONFIG_PATH
+              value: /etc/talos-vmtoolsd/talosconfig
+            - name: TALOS_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          resources:
+            requests:
+              memory: 32Mi
+              cpu: 100m
+            limits:
+              memory: 64Mi
+              cpu: 500m
+          securityContext:
+            readOnlyRootFilesystem: true
+      volumes:
+        - name: config
+          secret:
+            secretName: talos-vmtoolsd-config
+            defaultMode: 0400
