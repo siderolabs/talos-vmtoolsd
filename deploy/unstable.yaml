@@ -16,6 +16,7 @@ spec:
     spec:
       priorityClassName: system-node-critical
       restartPolicy: Always
+      imagePullPolicy: Always
       tolerations:
         - key: node.cloudprovider.kubernetes.io/uninitialized
           operator: Exists
