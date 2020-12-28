@@ -16,7 +16,6 @@ spec:
     spec:
       priorityClassName: system-node-critical
       restartPolicy: Always
-      imagePullPolicy: Always
       tolerations:
         - key: node.cloudprovider.kubernetes.io/uninitialized
           operator: Exists
@@ -29,6 +28,7 @@ spec:
           effect: NoSchedule
       containers:
         - image: ghcr.io/mologie/talos-vmtoolsd-unstable:latest
+          imagePullPolicy: Always
           name: talos-vmtoolsd
           volumeMounts:
             - name: config
