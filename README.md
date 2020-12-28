@@ -37,7 +37,7 @@ kubectl apply -f https://raw.githubusercontent.com/mologie/talos-vmtoolsd/master
 
 # Why not open-vm-tools?
 
-The standard open-vm-tools package in a contain has two shortcomings under Talos:
+The standard open-vm-tools package in a container has two shortcomings under Talos:
 
 1. It wants a shutdown binary, but there is none that works properly with Talos.
 2. Its out-of-band process and file management goes against Talos' immutability principle.
@@ -50,7 +50,7 @@ Talos' apid may be used to talk to local services by omitting a node context. Th
 
 Combining both, talos-vmtoolsd was born: A single lightweight process that can talk to both ESXi and Talos' apid. It simply translates between both interfaces and thereby seamlessly integrates them.
 
-To expand on the second point, open-vm-tools features hypervisor integrations that for example enable file drag and drop. Unfortunately, these are essentially a backdoor into the VM's OS, which Talos attempts to avoid by not even providing a shell. Talos-vmtoolsd does not include any advanced functionality that can be found in open-vm-tools and thus avoid any issues regarding isolation and immutability.
+To expand on the second point, open-vm-tools features hypervisor integrations that for example enable file drag and drop. Unfortunately, these are essentially a backdoor into the VM's OS, which Talos attempts to avoid by not even providing a shell. Talos-vmtoolsd does not include any advanced functionality that can be found in open-vm-tools and thus avoids any issues regarding isolation and immutability.
 
 (It may or may not be a factor that I was bored during Covid-Christmas ;-D.)
 
