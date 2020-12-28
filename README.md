@@ -41,6 +41,7 @@ The standard open-vm-tools package in a container has two shortcomings under Tal
 
 1. It wants a shutdown binary, but there is none that works properly with Talos.
 2. Its out-of-band process and file management goes against Talos' immutability principle.
+3. Exposing virtual network adapters to vSphere can cause issues like described in the [VMware CPI documentation](https://cloud-provider-vsphere.sigs.k8s.io/known_issues.html). No workarounds are necessary for talos-vmtoolsd.
 
 The standard open-vm-tools package expects to run on the host and have some program (e.g. `/usr/bin/shutdown`) to handle shutdown requests. Running open-vm-tools in a privileged container may work, but it provides mediocre results with Talos. For example, I have observed shutdown commands from containers to bypass apid and be either ignored or lead to unclean termination of pods.
 
