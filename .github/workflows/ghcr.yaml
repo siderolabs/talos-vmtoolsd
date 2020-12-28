@@ -1,7 +1,14 @@
 name: GitHub Container Registry
 
 on:
-  - push
+  push:
+    paths-ignore:
+      - '.github/**'
+      - '.gitignore'
+      - 'deploy/**'
+      - 'docs/**'
+      - 'LICENSE'
+      - 'README.md'
 
 jobs:
   ghr_push:
