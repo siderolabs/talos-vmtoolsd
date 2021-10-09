@@ -49,17 +49,17 @@ type GuestInfoCommands struct {
 func (cmd *GuestInfoCommands) PrimaryIP() string {
 	ifs := cmd.delegate.NetInterfaces()
 	if len(ifs) < 1 {
-		cmd.log.Printf("[guestinfo] not ending primary IP: no interfaces received from upstream")
+		cmd.log.Printf("[guestinfo] not sending primary IP: no interfaces received from upstream")
 		return unknownIP
 	}
 	addrs := ifs[0].Addrs
 	if len(addrs) < 1 {
-		cmd.log.Printf("[guestinfo] not ending primary IP: first upstream adapter has no addresses")
+		cmd.log.Printf("[guestinfo] not sending primary IP: first upstream adapter has no addresses")
 		return unknownIP
 	}
 	ipnet, ok := addrs[0].(*net.IPNet)
 	if !ok {
-		cmd.log.Printf("[guestinfo] not ending primary IP: expected first upstream IP with type net.IPNet")
+		cmd.log.Printf("[guestinfo] not sending primary IP: expected first upstream IP with type net.IPNet")
 		return unknownIP
 	}
 	return ipnet.IP.String()
