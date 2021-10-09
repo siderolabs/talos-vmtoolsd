@@ -4,6 +4,7 @@ go 1.17
 
 require (
 	github.com/golang/protobuf v1.5.2
+	github.com/sirupsen/logrus v1.8.1
 	github.com/stellar/go-xdr v0.0.0-20211004181054-b95df30963cd
 	github.com/talos-systems/talos/pkg/machinery v0.12.3
 	github.com/vmware/govmomi v0.26.1
