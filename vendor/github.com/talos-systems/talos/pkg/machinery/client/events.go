@@ -13,10 +13,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 
 	machineapi "github.com/talos-systems/talos/pkg/machinery/api/machine"
+	"github.com/talos-systems/talos/pkg/machinery/proto"
 )
 
 // EventsOptionFunc defines the options for the Events API.
@@ -66,7 +65,7 @@ type Event struct {
 
 // EventsWatch wraps Events by providing more simple interface.
 //
-//nolint: gocyclo
+//nolint:gocyclo
 func (c *Client) EventsWatch(ctx context.Context, watchFunc func(<-chan Event), opts ...EventsOptionFunc) error {
 	stream, err := c.Events(ctx, opts...)
 	if err != nil {
@@ -97,7 +96,7 @@ func (c *Client) EventsWatch(ctx context.Context, watchFunc func(<-chan Event), 
 	for {
 		event, err := stream.Recv()
 		if err != nil {
-			if err == io.EOF || status.Code(err) == codes.Canceled {
+			if err == io.EOF || StatusCode(err) == codes.Canceled {
 				return nil
 			}
 

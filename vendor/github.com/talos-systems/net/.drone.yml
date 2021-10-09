@@ -1,7 +1,7 @@
 ---
 # THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
 #
-# Generated on 2020-09-16T20:23:27Z by kres 7e146df-dirty.
+# Generated on 2021-01-20T20:56:40Z by kres latest.
 
 kind: pipeline
 type: kubernetes
@@ -132,7 +132,6 @@ services:
   - --dns=8.8.4.4
   - --mtu=1500
   - --log-level=error
-  - --insecure-registry=http://registry.ci.svc:5000
   privileged: true
   volumes:
   - name: outer-docker-socket

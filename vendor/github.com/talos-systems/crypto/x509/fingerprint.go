@@ -55,7 +55,7 @@ func SPKIFingerprintFromDER(certDER []byte) (Fingerprint, error) {
 // SPKIFingerprint computes SPKI certificate fingerprint.
 func SPKIFingerprint(cert *x509.Certificate) Fingerprint {
 	hash := sha256.New()
-	hash.Write(cert.RawSubjectPublicKeyInfo) //nolint: errcheck
+	hash.Write(cert.RawSubjectPublicKeyInfo)
 
 	return Fingerprint(hash.Sum(nil))
 }
