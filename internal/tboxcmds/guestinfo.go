@@ -49,35 +49,35 @@ type GuestInfoCommands struct {
 func (cmd *GuestInfoCommands) PrimaryIP() string {
 	ifs := cmd.delegate.NetInterfaces()
 	if len(ifs) < 1 {
-		cmd.log.Printf("[guestinfo] not sending primary IP: no interfaces received from upstream")
+		cmd.log.Warn("not sending primary IP: no interfaces received from upstream")
 		return unknownIP
 	}
 	addrs := ifs[0].Addrs
 	if len(addrs) < 1 {
-		cmd.log.Printf("[guestinfo] not sending primary IP: first upstream adapter has no addresses")
+		cmd.log.Warn("not sending primary IP: first upstream adapter has no addresses")
 		return unknownIP
 	}
 	ipnet, ok := addrs[0].(*net.IPNet)
 	if !ok {
-		cmd.log.Printf("[guestinfo] not sending primary IP: expected first upstream IP with type net.IPNet")
+		cmd.log.Warn("not sending primary IP: expected first upstream IP with type net.IPNet")
 		return unknownIP
 	}
 	return ipnet.IP.String()
 }
 
 func (cmd *GuestInfoCommands) GuestNicInfo() *GuestNicInfo {
-	// note: logging commented out because vmx polls these every 30s
+	// NB: this is polled by vSphere roughly every 30s
 	info := NewGuestNicInfo()
 	ifs := cmd.delegate.NetInterfaces()
 	for _, nic := range ifs {
 		nicDesc := GuestNicV3{MacAddress: nic.MAC}
 		for _, addr := range nic.Addrs {
 			nicDesc.AddIP(addr)
-			//cmd.log.Printf("[guestinfo] adding name=%v mac=%v ip=%v", nic.Name, nic.MAC, addr)
+			cmd.log.Debugf("GuestNicInfo: adding name=%v mac=%v ip=%v", nic.Name, nic.MAC, addr)
 		}
 		info.V3.Nics = append(info.V3.Nics, nicDesc)
 		if len(info.V3.Nics) >= maxNICs {
-			//cmd.log.Printf("[guestinfo] truncating NIC list to %v NICs", maxNICs)
+			cmd.log.Debugf("GuestNicInfo: truncating NIC list to %v NICs", maxNICs)
 			break
 		}
 	}
@@ -88,10 +88,10 @@ func (cmd *GuestInfoCommands) GuestNicInfo() *GuestNicInfo {
 }
 
 func (cmd *GuestInfoCommands) SendGuestInfo(kind int, buf []byte) {
-	// note: intentionally using two spaces as separator to match open-vm-tools
+	// NB: intentionally using two spaces as separator to match open-vm-tools
 	msg := append([]byte(fmt.Sprintf("SetGuestInfo  %d ", kind)), buf...)
 	if _, err := cmd.out.Request(msg); err != nil {
-		cmd.log.Printf("[guestinfo] error sending guest info %v: %v", kind, err)
+		cmd.log.WithError(err).WithField("guest_info_kind", kind).Error("error sending guest info")
 	}
 }
 
@@ -103,7 +103,7 @@ func (cmd *GuestInfoCommands) SendGuestInfoXDR(kind int, v interface{}) {
 	var buf bytes.Buffer
 	_, err := xdr.Marshal(&buf, v)
 	if err != nil {
-		cmd.log.Printf("[guestinfo] error encoding guest info %v: %v", kind, err)
+		cmd.log.WithError(err).WithField("guest_info_kind", kind).Error("error encoding guest info")
 		return
 	}
 	cmd.SendGuestInfo(kind, buf.Bytes())
@@ -111,21 +111,21 @@ func (cmd *GuestInfoCommands) SendGuestInfoXDR(kind int, v interface{}) {
 
 func (cmd *GuestInfoCommands) SendGuestInfoDNSName() {
 	if hostname := cmd.delegate.Hostname(); hostname != "" {
-		cmd.log.Printf("[guestinfo] sending hostname: %v", hostname)
+		cmd.log.Debugf("sending hostname: %v", hostname)
 		cmd.SendGuestInfoString(GuestInfoDNSName, hostname)
 	}
 }
 
 func (cmd *GuestInfoCommands) SendGuestInfoOSNameFull() {
 	if name := cmd.delegate.OSVersion(); name != "" {
-		cmd.log.Printf("[guestinfo] sending OS full name: %v", name)
+		cmd.log.Debugf("sending OS full name: %v", name)
 		cmd.SendGuestInfoString(GuestInfoOSNameFull, name)
 	}
 }
 
 func (cmd *GuestInfoCommands) SendGuestInfoOSName() {
 	if name := cmd.delegate.OSVersionShort(); name != "" {
-		cmd.log.Printf("[guestinfo] sending OS short name: %v", name)
+		cmd.log.Debugf("sending OS short name: %v", name)
 		cmd.SendGuestInfoString(GuestInfoOSName, name)
 	}
 }
@@ -137,7 +137,7 @@ func (cmd *GuestInfoCommands) SendGuestInfoNIC() {
 func (cmd *GuestInfoCommands) BroadcastIPOptionHandler(string, string) {
 	msg := fmt.Sprintf("info-set guestinfo.ip %s", cmd.PrimaryIP())
 	if _, err := cmd.out.Request([]byte(msg)); err != nil {
-		cmd.log.Printf("[guestinfo] error sending %q: %v", msg, err)
+		cmd.log.WithError(err).Error("error sending IP message")
 	}
 	cmd.SendGuestInfoNIC()
 }
@@ -150,7 +150,11 @@ func (cmd *GuestInfoCommands) PushGuestInfo() {
 }
 
 func RegisterGuestInfoCommands(svc *nanotoolbox.Service, delegate NicDelegate) {
-	cmd := &GuestInfoCommands{log: svc.Log, out: svc.Out, delegate: delegate}
+	cmd := &GuestInfoCommands{
+		log:      svc.Log.WithField("module", "tboxcmds"),
+		out:      svc.Out,
+		delegate: delegate,
+	}
 	svc.RegisterResetHandler(cmd.PushGuestInfo)
 	svc.RegisterOptionHandler("broadcastIP", cmd.BroadcastIPOptionHandler)
 }

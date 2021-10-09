@@ -17,10 +17,22 @@ func main() {
 		DisableTimestamp:  true,
 		DisableHTMLEscape: true,
 	})
-	l.Printf("talos-vmtoolsd version %v", tvmtoolsd.Version)
-	l.Print("Copyright 2020 Oliver Kuckertz <oliver.kuckertz@mologie.de>")
-	l.Print("Copyright 2017 VMware, Inc.")
-	l.Print("This program is free software and available under the Apache 2.0 license.")
+
+	// Apply log level, default to "info"
+	if levelStr, ok := os.LookupEnv("LOG_LEVEL"); ok {
+		if level, err := logrus.ParseLevel(levelStr); err != nil {
+			l.WithError(err).Fatal("error parsing log level")
+		} else {
+			l.SetLevel(level)
+		}
+	} else {
+		l.SetLevel(logrus.InfoLevel)
+	}
+
+	l.Infof("talos-vmtoolsd version %v\n"+
+		"Copyright 2020-2021 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
+		"This program is free software and available under the Apache 2.0 license.",
+		tvmtoolsd.Version)
 
 	// Our spec file passes the secret path and K8s host IP via env vars.
 	configPath := os.Getenv("TALOS_CONFIG_PATH")
@@ -37,11 +49,11 @@ func main() {
 	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
 	api, err := talosapi.NewLocalClient(l, configPath, k8sHost)
 	if err != nil {
-		l.Fatalf("error: could not connect to apid: %v", err)
+		l.WithError(err).Fatal("could not connect to apid")
 	}
 	defer func() {
 		if err := api.Close(); err != nil {
-			l.Printf("warning: failed to close API client during process shutdown: %v", err)
+			l.WithError(err).Warn("failed to close API client during process shutdown")
 		}
 	}()
 	tboxcmds.RegisterGuestInfoCommands(svc, api)
@@ -50,16 +62,16 @@ func main() {
 
 	// The toolbox service runs and response to RPC requests in the background.
 	if err := svc.Start(); err != nil {
-		l.Fatalf("error starting service: %v", err)
+		l.WithError(err).Fatal("error starting service")
 	}
 
-	// Graceful shutdown on SIGINT/SIGTERM.
+	// Graceful shutdown on SIGINT/SIGTERM
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		l.Printf("[main] received signal: %s", <-sig)
+		l.Debugf("signal: %s", <-sig)
 		svc.Stop()
 	}()
 	svc.Wait()
-	l.Println("[main] graceful shutdown done, fair winds!")
+	l.Info("graceful shutdown done, fair winds!")
 }
