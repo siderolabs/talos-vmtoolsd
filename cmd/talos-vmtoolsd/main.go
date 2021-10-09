@@ -5,18 +5,22 @@ import (
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/mologie/talos-vmtoolsd/internal/talosapi"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
-	"log"
+	"github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
 	"syscall"
 )
 
 func main() {
-	l := log.New(os.Stderr, "", log.LstdFlags)
+	l := logrus.StandardLogger()
+	l.SetFormatter(&logrus.JSONFormatter{
+		DisableTimestamp:  true,
+		DisableHTMLEscape: true,
+	})
 	l.Printf("talos-vmtoolsd version %v", tvmtoolsd.Version)
-	l.Println("Copyright 2020 Oliver Kuckertz <oliver.kuckertz@mologie.de>")
-	l.Println("Copyright 2017 VMware, Inc.")
-	l.Println("This program is free software and available under the Apache 2.0 license.")
+	l.Print("Copyright 2020 Oliver Kuckertz <oliver.kuckertz@mologie.de>")
+	l.Print("Copyright 2017 VMware, Inc.")
+	l.Print("This program is free software and available under the Apache 2.0 license.")
 
 	// Our spec file passes the secret path and K8s host IP via env vars.
 	configPath := os.Getenv("TALOS_CONFIG_PATH")
@@ -29,15 +33,15 @@ func main() {
 	}
 
 	// Wires up VMware Toolbox commands to Talos apid.
-	svc := nanotoolbox.NewService(nanotoolbox.NewHypervisorChannelPair())
-	svc.Log = l
+	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair()
+	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
 	api, err := talosapi.NewLocalClient(l, configPath, k8sHost)
 	if err != nil {
 		l.Fatalf("error: could not connect to apid: %v", err)
 	}
 	defer func() {
 		if err := api.Close(); err != nil {
-			log.Printf("warning: failed to close API client during process shutdown: %v", err)
+			l.Printf("warning: failed to close API client during process shutdown: %v", err)
 		}
 	}()
 	tboxcmds.RegisterGuestInfoCommands(svc, api)

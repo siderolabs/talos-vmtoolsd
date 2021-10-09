@@ -22,8 +22,7 @@ package nanotoolbox
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -42,7 +41,7 @@ const (
 
 // Service receives and dispatches incoming RPC requests from the vmx
 type Service struct {
-	Log *log.Logger
+	Log logrus.FieldLogger
 	Out *ChannelOut
 
 	in       Channel
@@ -59,9 +58,9 @@ type Service struct {
 }
 
 // NewService initializes a Service instance
-func NewService(rpcIn Channel, rpcOut Channel) *Service {
+func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service {
 	s := &Service{
-		Log: log.New(ioutil.Discard, "", 0),
+		Log: log,
 		Out: &ChannelOut{rpcOut},
 		in:  rpcIn,
 

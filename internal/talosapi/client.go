@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/sirupsen/logrus"
 	"github.com/talos-systems/talos/pkg/machinery/api/machine"
 	talosclient "github.com/talos-systems/talos/pkg/machinery/client"
 	talosconfig "github.com/talos-systems/talos/pkg/machinery/client/config"
-	"log"
 	"net"
 	"regexp"
 )
 
 type LocalClient struct {
 	ctx        context.Context
-	log        *log.Logger
+	log        logrus.FieldLogger
 	configPath string
 	k8sHost    string
 	api        *talosclient.Client
@@ -115,7 +115,7 @@ func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
 	return
 }
 
-func NewLocalClient(log *log.Logger, configPath string, k8sHost string) (*LocalClient, error) {
+func NewLocalClient(log logrus.FieldLogger, configPath string, k8sHost string) (*LocalClient, error) {
 	var err error
 	c := &LocalClient{ctx: context.Background(), log: log, configPath: configPath, k8sHost: k8sHost}
 	c.api, err = c.connect()

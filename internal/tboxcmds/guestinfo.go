@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/sirupsen/logrus"
 	xdr "github.com/stellar/go-xdr/xdr3"
-	"log"
 	"net"
 )
 
@@ -41,7 +41,7 @@ type NicDelegate interface {
 }
 
 type GuestInfoCommands struct {
-	log      *log.Logger
+	log      logrus.FieldLogger
 	out      *nanotoolbox.ChannelOut
 	delegate NicDelegate
 }

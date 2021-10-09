@@ -26,8 +26,8 @@ import (
 	"fmt"
 	tvmtoolsd "github.com/mologie/talos-vmtoolsd"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/toolbox/vix"
-	"log"
 )
 
 const (
@@ -44,7 +44,7 @@ type VixDelegate interface {
 }
 
 type VixCommandServer struct {
-	log      *log.Logger
+	log      logrus.FieldLogger
 	out      *nanotoolbox.ChannelOut
 	delegate VixDelegate
 	handlers map[uint32]VixCommandHandler

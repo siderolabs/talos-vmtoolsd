@@ -3,7 +3,7 @@ package tboxcmds
 import (
 	"fmt"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 // vmware/guestrpc/powerops.h
@@ -32,7 +32,7 @@ type PowerDelegate interface {
 type PowerHandler func() error
 
 type powerOp struct {
-	Log     *log.Logger
+	Log     logrus.FieldLogger
 	Out     *nanotoolbox.ChannelOut
 	State   int
 	Handler PowerHandler
