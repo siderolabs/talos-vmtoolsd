@@ -6,6 +6,7 @@ import (
 	"github.com/mologie/talos-vmtoolsd/internal/talosapi"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
 	"github.com/sirupsen/logrus"
+	"github.com/vmware/vmw-guestinfo/vmcheck"
 	"os"
 	"os/signal"
 	"syscall"
@@ -33,6 +34,15 @@ func main() {
 		"Copyright 2020-2021 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
 		"This program is free software and available under the Apache 2.0 license.",
 		tvmtoolsd.Version)
+
+	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
+	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
+	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
+	if !vmcheck.IsVirtualCPU() {
+		// NB: We cannot simply exit(0) because DaemonSets are always restarted.
+		l.Info("halting because the current node is not running under ESXi. fair winds!")
+		select {}
+	}
 
 	// Our spec file passes the secret path and K8s host IP via env vars.
 	configPath := os.Getenv("TALOS_CONFIG_PATH")
