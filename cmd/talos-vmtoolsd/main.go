@@ -6,6 +6,7 @@ import (
 	"github.com/mologie/talos-vmtoolsd/internal/talosapi"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
 	"github.com/sirupsen/logrus"
+	vmguestmsg "github.com/vmware/vmw-guestinfo/message"
 	"github.com/vmware/vmw-guestinfo/vmcheck"
 	"os"
 	"os/signal"
@@ -55,6 +56,7 @@ func main() {
 	}
 
 	// Wires up VMware Toolbox commands to Talos apid.
+	vmguestmsg.DefaultLogger = l.WithField("module", "vmware-guestinfo")
 	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair()
 	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
 	api, err := talosapi.NewLocalClient(l, configPath, k8sHost)
