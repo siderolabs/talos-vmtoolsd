@@ -3,7 +3,7 @@ package tboxcmds
 import (
 	"fmt"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
-	"log"
+	"github.com/sirupsen/logrus"
 )
 
 // vmware/guestrpc/powerops.h
@@ -32,29 +32,30 @@ type PowerDelegate interface {
 type PowerHandler func() error
 
 type powerOp struct {
-	Log     *log.Logger
-	Out     *nanotoolbox.ChannelOut
-	State   int
-	Handler PowerHandler
+	log     logrus.FieldLogger
+	out     *nanotoolbox.ChannelOut
+	state   int
+	handler PowerHandler
 }
 
 func (op powerOp) Name() string {
-	return powerCmdName[op.State]
+	return powerCmdName[op.state]
 }
 
 func (op powerOp) HandleCommand([]byte) ([]byte, error) {
-	op.Log.Printf("[cmds/power] handling power operation %v", op.Name())
+	l := op.log.WithField("power_operation", op.Name())
+	l.Debug("handling power operation")
 
 	rc := nanotoolbox.RpciOK
-	if op.Handler != nil {
-		if err := op.Handler(); err != nil {
-			op.Log.Printf("[cmds/power] error handling %q: %v", op.Name(), err)
+	if op.handler != nil {
+		if err := op.handler(); err != nil {
+			l.WithError(err).Error("error handling power operation")
 			rc = nanotoolbox.RpciERR
 		}
 	}
 
-	msg := fmt.Sprintf("tools.os.statechange.status %s%d\x00", rc, op.State)
-	if _, err := op.Out.Request([]byte(msg)); err != nil {
+	msg := fmt.Sprintf("tools.os.statechange.status %s%d\x00", rc, op.state)
+	if _, err := op.out.Request([]byte(msg)); err != nil {
 		return nil, fmt.Errorf("error sending %q: %w", msg, err)
 	}
 
@@ -62,7 +63,12 @@ func (op powerOp) HandleCommand([]byte) ([]byte, error) {
 }
 
 func powerOpHandler(svc *nanotoolbox.Service, state int, handler PowerHandler) (string, nanotoolbox.CommandHandler) {
-	op := powerOp{Log: svc.Log, Out: svc.Out, State: state, Handler: handler}
+	op := powerOp{
+		log:     svc.Log.WithField("command", "power"),
+		out:     svc.Out,
+		state:   state,
+		handler: handler,
+	}
 	return op.Name(), op.HandleCommand
 }
 

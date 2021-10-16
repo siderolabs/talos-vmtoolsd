@@ -29,9 +29,9 @@ func (ne *NodeError) Unwrap() error {
 	return ne.Err
 }
 
-// FilterMessages removes error Messagess from resp and builds multierror.
+// FilterMessages removes error Messages from resp and builds multierror.
 //
-//nolint: gocyclo
+//nolint:gocyclo,cyclop
 func FilterMessages(resp interface{}, err error) (interface{}, error) {
 	if resp == nil {
 		return nil, err
@@ -152,7 +152,7 @@ func FilterMessages(resp interface{}, err error) (interface{}, error) {
 		messagesField.SetLen(messagesField.Len() - 1)
 	}
 
-	// if all the Messagess were error Messagess...
+	// if all the Messages were error Messages...
 	if multiErr != nil && messagesField.Len() == 0 {
 		resp = nil
 	}

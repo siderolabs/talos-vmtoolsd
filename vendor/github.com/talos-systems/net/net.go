@@ -57,6 +57,13 @@ func FormatAddress(addr string) string {
 	return addr
 }
 
+// FormatCIDR formats IP from the network as CIDR notation.
+func FormatCIDR(ip net.IP, network net.IPNet) string {
+	ones, _ := network.Mask.Size()
+
+	return fmt.Sprintf("%s/%d", ip, ones)
+}
+
 // AddressContainsPort checks to see if the supplied address contains both an address and a port.
 // This will not catch every possible permutation, but it is a best-effort routine suitable for prechecking human-interactive parameters.
 func AddressContainsPort(addr string) bool {
@@ -108,6 +115,34 @@ func NthIPInNetwork(network *net.IPNet, n int) (net.IP, error) {
 	}
 
 	return nil, errors.New("network does not contain enough IPs")
+}
+
+// SplitCIDRs parses list of CIDRs in a string separated by commas.
+func SplitCIDRs(cidrList string) (out []*net.IPNet, err error) {
+	for _, podCIDR := range strings.Split(cidrList, ",") {
+		_, cidr, err := net.ParseCIDR(podCIDR)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse %q as a CIDR: %w", podCIDR, err)
+		}
+
+		out = append(out, cidr)
+	}
+
+	return out, nil
+}
+
+// NthIPInCIDRSet returns nth IP for each CIDR in the list.
+func NthIPInCIDRSet(cidrList []*net.IPNet, offset int) (out []net.IP, err error) {
+	for _, cidr := range cidrList {
+		ip, err := NthIPInNetwork(cidr, offset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to calculate offset %d from CIDR %s: %w", offset, cidr, err)
+		}
+
+		out = append(out, ip)
+	}
+
+	return out, nil
 }
 
 // DNSNames returns a default set of machine names. It includes the hostname,
@@ -176,6 +211,19 @@ func IsIPv6(addrs ...net.IP) bool {
 	return false
 }
 
+// IsNonLocalIPv6 indicates whether provided address is non-local IPv6 address.
+func IsNonLocalIPv6(in net.IP) bool {
+	if in == nil || in.IsLoopback() || in.IsUnspecified() {
+		return false
+	}
+
+	if in.To4() == nil && in.To16() != nil {
+		return true
+	}
+
+	return false
+}
+
 // ValidateEndpointURI checks that an endpoint is valid.
 // This is a more strict check that merely `url.Parse`, in that it requires such things as properly-ranged numeric ports and bracket-enclosed IPv6 addresses.
 func ValidateEndpointURI(ep string) error {
@@ -214,4 +262,47 @@ func validatePortNumber(p string) error {
 	}
 
 	return nil
+}
+
+// ParseCIDR parses a CIDR-formatted IP address.
+// Unlike the standard library version, this will return the IP address itself, rather than the bare IP and the network address.
+// If no CIDR notation is supplied, the address is presumed to be on a solo network (/32 for IPv4 or /128 for IPv6).
+// NOTE: Unlike rtnl.ParseCIDR, this allows network addresses, since in many
+// places in the kubernetes ecosystem, the functionality of a "network address"
+// is not used and improperly prevents the use of an entire range of IP
+// addresses.
+func ParseCIDR(in string) (*net.IPNet, error) {
+	if AddressContainsPort(in) {
+		return nil, fmt.Errorf("CIDR address %q must not contain a port", in)
+	}
+
+	// Strip any IPv6 brackets.
+	in = strings.Map(func(r rune) rune {
+		switch r {
+		case '[':
+			return rune(-1)
+		case ']':
+			return rune(-1)
+		default:
+			return r
+		}
+	}, in)
+
+	// If we have no subnet, assume it is solo.
+	if soloIP := net.ParseIP(in); soloIP != nil {
+		if IsIPv6(soloIP) {
+			in += "/128"
+		} else {
+			in += "/32"
+		}
+	}
+
+	baseIP, cidr, err := net.ParseCIDR(in)
+	if err != nil {
+		return nil, err
+	}
+
+	cidr.IP = baseIP
+
+	return cidr, nil
 }

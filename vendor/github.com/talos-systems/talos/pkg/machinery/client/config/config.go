@@ -6,19 +6,36 @@ package config
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
+	"github.com/talos-systems/crypto/x509"
 	yaml "gopkg.in/yaml.v3"
 )
 
-// Config represents the configuration file.
+// Config represents the client configuration file (talosconfig).
 type Config struct {
 	Context  string              `yaml:"context"`
 	Contexts map[string]*Context `yaml:"contexts"`
+}
+
+// NewConfig returns the client configuration file with a single context.
+func NewConfig(contextName string, endpoints []string, caCrt []byte, client *x509.PEMEncodedCertificateAndKey) *Config {
+	return &Config{
+		Context: contextName,
+		Contexts: map[string]*Context{
+			contextName: {
+				Endpoints: endpoints,
+				CA:        base64.StdEncoding.EncodeToString(caCrt),
+				Crt:       base64.StdEncoding.EncodeToString(client.Crt),
+				Key:       base64.StdEncoding.EncodeToString(client.Key),
+			},
+		},
+	}
 }
 
 func (c *Config) upgrade() {
@@ -57,7 +74,7 @@ func Open(p string) (c *Config, err error) {
 		return
 	}
 
-	defer f.Close() //nolint: errcheck
+	defer f.Close() //nolint:errcheck
 
 	return ReadFrom(f)
 }
@@ -123,6 +140,10 @@ func (r *Rename) String() string {
 //
 // Current context is overridden from passed in config.
 func (c *Config) Merge(cfg *Config) []Rename {
+	if c.Contexts == nil {
+		c.Contexts = map[string]*Context{}
+	}
+
 	mappedContexts := map[string]string{}
 	renames := []Rename{}
 

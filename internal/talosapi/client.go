@@ -5,17 +5,17 @@ import (
 	"fmt"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/sirupsen/logrus"
 	"github.com/talos-systems/talos/pkg/machinery/api/machine"
 	talosclient "github.com/talos-systems/talos/pkg/machinery/client"
 	talosconfig "github.com/talos-systems/talos/pkg/machinery/client/config"
-	"log"
 	"net"
 	"regexp"
 )
 
 type LocalClient struct {
 	ctx        context.Context
-	log        *log.Logger
+	log        logrus.FieldLogger
 	configPath string
 	k8sHost    string
 	api        *talosclient.Client
@@ -63,7 +63,7 @@ func (c *LocalClient) osVersionInfo() (*machine.VersionInfo, error) {
 func (c *LocalClient) OSVersion() string {
 	v, err := c.osVersionInfo()
 	if err != nil {
-		c.log.Printf("[talosapi] error retrieving OS version information: %v", err)
+		c.log.WithError(err).Error("error retrieving OS version information")
 		return "Talos"
 	}
 	return fmt.Sprintf("Talos %s-%s", v.Tag, v.Sha)
@@ -72,7 +72,7 @@ func (c *LocalClient) OSVersion() string {
 func (c *LocalClient) OSVersionShort() string {
 	v, err := c.osVersionInfo()
 	if err != nil {
-		c.log.Printf("[talosapi] error retrieving OS version information: %v", err)
+		c.log.WithError(err).Error("error retrieving OS version information")
 		return "Talos"
 	}
 	return fmt.Sprintf("Talos %s", v.Tag)
@@ -81,7 +81,7 @@ func (c *LocalClient) OSVersionShort() string {
 func (c *LocalClient) Hostname() string {
 	resp, err := c.api.MachineClient.Hostname(c.ctx, &empty.Empty{})
 	if err != nil || len(resp.Messages) == 0 {
-		c.log.Printf("[talosapi] error retrieving hostname: %v", err)
+		c.log.WithError(err).Error("error retrieving hostname")
 		return ""
 	} else {
 		return resp.Messages[0].Hostname
@@ -91,7 +91,7 @@ func (c *LocalClient) Hostname() string {
 func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
 	resp, err := c.api.Interfaces(c.ctx)
 	if err != nil || len(resp.Messages) == 0 {
-		c.log.Printf("[talosapi] error retrieving network interface list: %v", err)
+		c.log.WithError(err).Error("error retrieving network interface list")
 		return nil
 	}
 	ifs := resp.Messages[0].Interfaces
@@ -115,9 +115,14 @@ func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
 	return
 }
 
-func NewLocalClient(log *log.Logger, configPath string, k8sHost string) (*LocalClient, error) {
+func NewLocalClient(log logrus.FieldLogger, configPath string, k8sHost string) (*LocalClient, error) {
 	var err error
-	c := &LocalClient{ctx: context.Background(), log: log, configPath: configPath, k8sHost: k8sHost}
+	c := &LocalClient{
+		ctx:        context.Background(),
+		log:        log.WithField("module", "talosapi"),
+		configPath: configPath,
+		k8sHost:    k8sHost,
+	}
 	c.api, err = c.connect()
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to apid: %v", err)

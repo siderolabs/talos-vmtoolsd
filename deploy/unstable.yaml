@@ -14,6 +14,8 @@ spec:
       labels:
         app: talos-vmtoolsd
     spec:
+      automountServiceAccountToken: false
+      enableServiceLinks: false
       priorityClassName: system-node-critical
       restartPolicy: Always
       tolerations:
@@ -33,6 +35,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/talos-vmtoolsd
+              readOnly: true
           env:
             - name: TALOS_CONFIG_PATH
               value: /etc/talos-vmtoolsd/talosconfig
@@ -42,13 +45,17 @@ spec:
                   fieldPath: status.hostIP
           resources:
             requests:
-              memory: 32Mi
-              cpu: 100m
+              memory: 8Mi
             limits:
               memory: 64Mi
               cpu: 500m
           securityContext:
             readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            runAsUser: 1002
+            runAsGroup: 1002
+      securityContext:
+        fsGroup: 1002
       volumes:
         - name: config
           secret:

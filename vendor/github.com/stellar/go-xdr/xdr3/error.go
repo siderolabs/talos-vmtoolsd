@@ -106,6 +106,11 @@ type UnmarshalError struct {
 	Err         error       // The underlying error for IO errors
 }
 
+// Unwrap returns the underlying error if there is one.
+func (e *UnmarshalError) Unwrap() error {
+	return e.Err
+}
+
 // Error satisfies the error interface and prints human-readable errors.
 func (e *UnmarshalError) Error() string {
 	switch e.ErrorCode {
@@ -143,6 +148,11 @@ type MarshalError struct {
 	Value       interface{} // Value actually parsed where appropriate
 	Description string      // Human readable description of the issue
 	Err         error       // The underlying error for IO errors
+}
+
+// Unwrap returns the underlying error if there is one.
+func (e *MarshalError) Unwrap() error {
+	return e.Err
 }
 
 // Error satisfies the error interface and prints human-readable errors.

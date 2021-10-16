@@ -26,8 +26,8 @@ import (
 	"fmt"
 	tvmtoolsd "github.com/mologie/talos-vmtoolsd"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/toolbox/vix"
-	"log"
 )
 
 const (
@@ -44,14 +44,18 @@ type VixDelegate interface {
 }
 
 type VixCommandServer struct {
-	log      *log.Logger
+	log      logrus.FieldLogger
 	out      *nanotoolbox.ChannelOut
 	delegate VixDelegate
 	handlers map[uint32]VixCommandHandler
 }
 
 func RegisterVixCommand(svc *nanotoolbox.Service, delegate VixDelegate) {
-	svr := &VixCommandServer{log: svc.Log, out: svc.Out, delegate: delegate}
+	svr := &VixCommandServer{
+		log:      svc.Log.WithField("command", "vix"),
+		out:      svc.Out,
+		delegate: delegate,
+	}
 	svr.handlers = map[uint32]VixCommandHandler{vix.CommandGetToolsState: svr.GetToolsState}
 	svc.RegisterCommandHandler("Vix_1_Relayed_Command", svr.Dispatch)
 }
@@ -96,30 +100,31 @@ func (c *VixCommandServer) Dispatch(data []byte) ([]byte, error) {
 	if data[0] == 0 {
 		data = data[1:]
 	}
+	l := c.log.WithField("command_name", name)
 
 	var header vix.CommandRequestHeader
 	buf := bytes.NewBuffer(data)
 	err := binary.Read(buf, binary.LittleEndian, &header)
 	if err != nil {
-		c.log.Printf("[vix] decoding command %q failed: %v", name, err)
+		l.WithError(err).Print("decoding command failed")
 		return nil, err
 	}
 
 	if header.Magic != vix.CommandMagicWord {
-		c.log.Printf("[vix] handling command %q failed: invalid header", name)
+		l.Print("invalid magic header for command")
 		return commandResult(header, vix.InvalidMessageHeader, nil, nil), nil
 	}
 
 	handler, ok := c.handlers[header.OpCode]
 	if !ok {
-		c.log.Printf("[vix] unhandled command: %v", name)
+		l.Warn("unhandled command")
 		return commandResult(header, vix.UnrecognizedCommandInGuest, nil, nil), nil
 	}
 
 	rc := vix.OK
 	response, err := handler(header, buf.Bytes())
 	if err != nil {
-		c.log.Printf("[vix] command handler %q failed: %v", name, err)
+		l.WithError(err).Error("command handler failed")
 		rc = vix.ErrorCode(err)
 	}
 
@@ -134,7 +139,7 @@ func (c *VixCommandServer) GetToolsState(_ vix.CommandRequestHeader, _ []byte) (
 	version := c.delegate.OSVersion()
 	versionShort := c.delegate.OSVersionShort()
 	hostname := c.delegate.Hostname()
-	c.log.Printf("[vix] sending tools state version=%q versionShort=%q hostname=%q",
+	c.log.Debugf("sending tools state version=%q versionShort=%q hostname=%q",
 		version, versionShort, hostname)
 	props := vix.PropertyList{
 		vix.NewStringProperty(vix.PropertyGuestOsVersion, version),

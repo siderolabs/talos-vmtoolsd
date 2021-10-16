@@ -1,8 +1,8 @@
-# syntax = docker/dockerfile-upstream:1.1.7-experimental
+# syntax = docker/dockerfile-upstream:1.2.0-labs
 
 # THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
 #
-# Generated on 2020-09-16T20:23:27Z by kres 7e146df-dirty.
+# Generated on 2021-01-20T20:56:40Z by kres latest.
 
 ARG TOOLCHAIN
 
@@ -24,7 +24,7 @@ FROM toolchain AS tools
 ENV GO111MODULE on
 ENV CGO_ENABLED 0
 ENV GOPATH /go
-RUN curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b /bin v1.30.0
+RUN curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | bash -s -- -b /bin v1.33.0
 ARG GOFUMPT_VERSION
 RUN cd $(mktemp -d) \
 	&& go mod init tmp \

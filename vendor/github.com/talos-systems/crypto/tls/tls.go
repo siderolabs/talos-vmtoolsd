@@ -125,14 +125,14 @@ func defaultConfig() *tls.Config {
 }
 
 // New returns a new TLS Configuration modified by any provided configuration options.
-func New(opts ...ConfigOptionFunc) (cfg *tls.Config, err error) {
-	cfg = defaultConfig()
+func New(opts ...ConfigOptionFunc) (*tls.Config, error) {
+	cfg := defaultConfig()
 
 	for _, f := range opts {
-		if err = f(cfg); err != nil {
-			return
+		if err := f(cfg); err != nil {
+			return nil, err
 		}
 	}
 
-	return
+	return cfg, nil
 }

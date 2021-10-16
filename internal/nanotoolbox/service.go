@@ -22,8 +22,7 @@ package nanotoolbox
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"github.com/sirupsen/logrus"
 	"sync"
 	"time"
 )
@@ -32,17 +31,17 @@ const (
 	// TOOLS_VERSION_UNMANAGED as defined in open-vm-tools/lib/include/vm_tools_version.h
 	toolsVersionUnmanaged = 0x7fffffff
 
-	// RPCIN_MAX_DELAY as defined in rpcChannelInt.h:
+	// RPCIN_MAX_DELAY as defined in rpcChannelInt.h
 	maxDelay = 100 * time.Millisecond
 
 	// If we have an RPCI send error, the channels will be reset.
-	// open-vm-tools/lib/rpcChannel/rpcChannel.c:RpcChannelCheckReset also backs off in this case
+	// open-vm-tools/lib/rpcChannel/rpcChannel.c:RpcChannelCheckReset also backs off in this case.
 	resetDelay = 5 * time.Second
 )
 
 // Service receives and dispatches incoming RPC requests from the vmx
 type Service struct {
-	Log *log.Logger
+	Log logrus.FieldLogger
 	Out *ChannelOut
 
 	in       Channel
@@ -59,9 +58,9 @@ type Service struct {
 }
 
 // NewService initializes a Service instance
-func NewService(rpcIn Channel, rpcOut Channel) *Service {
+func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service {
 	s := &Service{
-		Log: log.New(ioutil.Discard, "", 0),
+		Log: log.WithField("module", "nanotoolbox"),
 		Out: &ChannelOut{rpcOut},
 		in:  rpcIn,
 
@@ -78,7 +77,7 @@ func NewService(rpcIn Channel, rpcOut Channel) *Service {
 	s.RegisterCommandHandler("Set_Option", s.HandleSetOption)
 	s.RegisterCommandHandler("Capabilities_Register", s.HandleCapabilitiesRegister)
 
-	// Without tools.set.version, the UI reports Tools are "running", but "not installed"
+	// Without tools.set.version the UI reports Tools are "running", but "not installed"
 	s.AddCapability(fmt.Sprintf("tools.set.version %d", toolsVersionUnmanaged))
 
 	return s
@@ -218,11 +217,12 @@ func (s *Service) Dispatch(request []byte) []byte {
 
 	// Trim NULL byte terminator
 	name = bytes.TrimRight(name, "\x00")
+	l := s.Log.WithField("handler_name", name)
 
 	handler, ok := s.commandHandlers[string(name)]
 
 	if !ok {
-		s.Log.Printf("[service] unknown command: %q\n", name)
+		l.Debug("unknown command")
 		return []byte("Unknown Command")
 	}
 
@@ -235,7 +235,7 @@ func (s *Service) Dispatch(request []byte) []byte {
 	if err == nil {
 		response = append([]byte("OK "), response...)
 	} else {
-		s.Log.Printf("[service] error calling handler %q: %s\n", name, err)
+		l.WithError(err).Warn("error calling handler")
 		response = append([]byte("ERR "), response...)
 	}
 

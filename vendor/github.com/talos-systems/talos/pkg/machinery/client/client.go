@@ -18,22 +18,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/golang/protobuf/ptypes/empty"
 	grpctls "github.com/talos-systems/crypto/tls"
 	"github.com/talos-systems/net"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	clusterapi "github.com/talos-systems/talos/pkg/machinery/api/cluster"
 	"github.com/talos-systems/talos/pkg/machinery/api/common"
+	inspectapi "github.com/talos-systems/talos/pkg/machinery/api/inspect"
 	machineapi "github.com/talos-systems/talos/pkg/machinery/api/machine"
 	networkapi "github.com/talos-systems/talos/pkg/machinery/api/network"
+	resourceapi "github.com/talos-systems/talos/pkg/machinery/api/resource"
 	storageapi "github.com/talos-systems/talos/pkg/machinery/api/storage"
 	timeapi "github.com/talos-systems/talos/pkg/machinery/api/time"
-	"github.com/talos-systems/talos/pkg/machinery/client/config"
+	clientconfig "github.com/talos-systems/talos/pkg/machinery/client/config"
 	"github.com/talos-systems/talos/pkg/machinery/constants"
 )
 
@@ -47,13 +48,19 @@ type Credentials struct {
 // Client implements the proto.MachineServiceClient interface. It serves as the
 // concrete type with the required methods.
 type Client struct {
-	options       *Options
-	conn          *grpc.ClientConn
-	MachineClient machineapi.MachineServiceClient
-	TimeClient    timeapi.TimeServiceClient
-	NetworkClient networkapi.NetworkServiceClient
-	ClusterClient clusterapi.ClusterServiceClient
-	StorageClient storageapi.StorageServiceClient
+	options *Options
+	conn    *grpc.ClientConn
+
+	MachineClient  machineapi.MachineServiceClient
+	TimeClient     timeapi.TimeServiceClient
+	NetworkClient  networkapi.NetworkServiceClient
+	ClusterClient  clusterapi.ClusterServiceClient
+	StorageClient  storageapi.StorageServiceClient
+	ResourceClient resourceapi.ResourceServiceClient
+	InspectClient  inspectapi.InspectServiceClient
+
+	Resources *ResourcesClient
+	Inspect   *InspectClient
 }
 
 func (c *Client) resolveConfigContext() error {
@@ -95,7 +102,7 @@ func (c *Client) resolveConfigContext() error {
 }
 
 // GetConfigContext returns resolved config context.
-func (c *Client) GetConfigContext() *config.Context {
+func (c *Client) GetConfigContext() *clientconfig.Context {
 	if err := c.resolveConfigContext(); err != nil {
 		return nil
 	}
@@ -103,7 +110,9 @@ func (c *Client) GetConfigContext() *config.Context {
 	return c.options.configContext
 }
 
-func (c *Client) getEndpoints() []string {
+// GetEndpoints returns the client's endpoints from the override set with WithEndpoints
+// or from the configuration.
+func (c *Client) GetEndpoints() []string {
 	if c.options.unixSocketPath != "" {
 		return []string{c.options.unixSocketPath}
 	}
@@ -135,11 +144,11 @@ func New(ctx context.Context, opts ...OptionFunc) (c *Client, err error) {
 		}
 	}
 
-	if len(c.getEndpoints()) < 1 {
+	if len(c.GetEndpoints()) < 1 {
 		return nil, errors.New("failed to determine endpoints")
 	}
 
-	c.conn, err = c.getConn(ctx)
+	c.conn, err = c.GetConn(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client connection: %w", err)
 	}
@@ -149,12 +158,18 @@ func New(ctx context.Context, opts ...OptionFunc) (c *Client, err error) {
 	c.NetworkClient = networkapi.NewNetworkServiceClient(c.conn)
 	c.ClusterClient = clusterapi.NewClusterServiceClient(c.conn)
 	c.StorageClient = storageapi.NewStorageServiceClient(c.conn)
+	c.ResourceClient = resourceapi.NewResourceServiceClient(c.conn)
+	c.InspectClient = inspectapi.NewInspectServiceClient(c.conn)
+
+	c.Resources = &ResourcesClient{c.ResourceClient}
+	c.Inspect = &InspectClient{c.InspectClient}
 
 	return c, nil
 }
 
-func (c *Client) getConn(ctx context.Context, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
-	endpoints := c.getEndpoints()
+// GetConn creates new gRPC connection.
+func (c *Client) GetConn(ctx context.Context, opts ...grpc.DialOption) (*grpc.ClientConn, error) {
+	endpoints := c.GetEndpoints()
 
 	var target string
 
@@ -210,7 +225,7 @@ func (c *Client) getConn(ctx context.Context, opts ...grpc.DialOption) (*grpc.Cl
 }
 
 // CredentialsFromConfigContext constructs the client Credentials from the given configuration Context.
-func CredentialsFromConfigContext(context *config.Context) (*Credentials, error) {
+func CredentialsFromConfigContext(context *clientconfig.Context) (*Credentials, error) {
 	caBytes, err := base64.StdEncoding.DecodeString(context.CA)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding CA: %w", err)
@@ -240,8 +255,8 @@ func CredentialsFromConfigContext(context *config.Context) (*Credentials, error)
 // NewClientContextAndCredentialsFromConfig initializes Credentials from config file.
 //
 // Deprecated: use Option-based methods for client creation.
-func NewClientContextAndCredentialsFromConfig(p, ctx string) (context *config.Context, creds *Credentials, err error) {
-	c, err := config.Open(p)
+func NewClientContextAndCredentialsFromConfig(p, ctx string) (context *clientconfig.Context, creds *Credentials, err error) {
+	c, err := clientconfig.Open(p)
 	if err != nil {
 		return
 	}
@@ -254,7 +269,7 @@ func NewClientContextAndCredentialsFromConfig(p, ctx string) (context *config.Co
 // NewClientContextAndCredentialsFromParsedConfig initializes Credentials from parsed configuration.
 //
 // Deprecated: use Option-based methods for client creation.
-func NewClientContextAndCredentialsFromParsedConfig(c *config.Config, ctx string) (context *config.Context, creds *Credentials, err error) {
+func NewClientContextAndCredentialsFromParsedConfig(c *clientconfig.Config, ctx string) (context *clientconfig.Context, creds *Credentials, err error) {
 	if ctx != "" {
 		c.Context = ctx
 	}
@@ -307,7 +322,7 @@ func (c *Client) Close() error {
 
 // KubeconfigRaw returns K8s client config (kubeconfig).
 func (c *Client) KubeconfigRaw(ctx context.Context) (io.ReadCloser, <-chan error, error) {
-	stream, err := c.MachineClient.Kubeconfig(ctx, &empty.Empty{})
+	stream, err := c.MachineClient.Kubeconfig(ctx, &emptypb.Empty{})
 	if err != nil {
 		return nil, nil, err
 	}
@@ -316,7 +331,7 @@ func (c *Client) KubeconfigRaw(ctx context.Context) (io.ReadCloser, <-chan error
 }
 
 func (c *Client) extractKubeconfig(r io.ReadCloser) ([]byte, error) {
-	defer r.Close() //nolint: errcheck
+	defer r.Close() //nolint:errcheck
 
 	gzR, err := gzip.NewReader(r)
 	if err != nil {
@@ -371,17 +386,35 @@ func (c *Client) Kubeconfig(ctx context.Context) ([]byte, error) {
 
 // ApplyConfiguration implements proto.MachineServiceClient interface.
 func (c *Client) ApplyConfiguration(ctx context.Context, req *machineapi.ApplyConfigurationRequest, callOptions ...grpc.CallOption) (resp *machineapi.ApplyConfigurationResponse, err error) {
-	return c.MachineClient.ApplyConfiguration(ctx, req, callOptions...)
+	resp, err = c.MachineClient.ApplyConfiguration(ctx, req, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*machineapi.ApplyConfigurationResponse) //nolint:errcheck
+
+	return
 }
 
 // GenerateConfiguration implements proto.MachineServiceClient interface.
 func (c *Client) GenerateConfiguration(ctx context.Context, req *machineapi.GenerateConfigurationRequest, callOptions ...grpc.CallOption) (resp *machineapi.GenerateConfigurationResponse, err error) {
-	return c.MachineClient.GenerateConfiguration(ctx, req, callOptions...)
+	resp, err = c.MachineClient.GenerateConfiguration(ctx, req, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*machineapi.GenerateConfigurationResponse) //nolint:errcheck
+
+	return
 }
 
 // Disks returns the list of block devices.
 func (c *Client) Disks(ctx context.Context, callOptions ...grpc.CallOption) (resp *storageapi.DisksResponse, err error) {
-	return c.StorageClient.Disks(ctx, &empty.Empty{}, callOptions...)
+	resp, err = c.StorageClient.Disks(ctx, &emptypb.Empty{}, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*storageapi.DisksResponse) //nolint:errcheck
+
+	return
 }
 
 // Stats implements the proto.MachineServiceClient interface.
@@ -396,7 +429,7 @@ func (c *Client) Stats(ctx context.Context, namespace string, driver common.Cont
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.StatsResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.StatsResponse) //nolint:errcheck
 
 	return
 }
@@ -414,7 +447,7 @@ func (c *Client) Containers(ctx context.Context, namespace string, driver common
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ContainersResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ContainersResponse) //nolint:errcheck
 
 	return
 }
@@ -458,18 +491,7 @@ func (c *Client) ResetGeneric(ctx context.Context, req *machineapi.ResetRequest)
 
 // Reboot implements the proto.MachineServiceClient interface.
 func (c *Client) Reboot(ctx context.Context) (err error) {
-	resp, err := c.MachineClient.Reboot(ctx, &empty.Empty{})
-
-	if err == nil {
-		_, err = FilterMessages(resp, err)
-	}
-
-	return
-}
-
-// Recover implements the proto.MachineServiceClient interface.
-func (c *Client) Recover(ctx context.Context, source machineapi.RecoverRequest_Source) (err error) {
-	resp, err := c.MachineClient.Recover(ctx, &machineapi.RecoverRequest{Source: source})
+	resp, err := c.MachineClient.Reboot(ctx, &emptypb.Empty{})
 
 	if err == nil {
 		_, err = FilterMessages(resp, err)
@@ -490,8 +512,8 @@ func (c *Client) Rollback(ctx context.Context) (err error) {
 }
 
 // Bootstrap implements the proto.MachineServiceClient interface.
-func (c *Client) Bootstrap(ctx context.Context) (err error) {
-	resp, err := c.MachineClient.Bootstrap(ctx, &machineapi.BootstrapRequest{})
+func (c *Client) Bootstrap(ctx context.Context, req *machineapi.BootstrapRequest) (err error) {
+	resp, err := c.MachineClient.Bootstrap(ctx, req)
 
 	if err == nil {
 		_, err = FilterMessages(resp, err)
@@ -502,7 +524,7 @@ func (c *Client) Bootstrap(ctx context.Context) (err error) {
 
 // Shutdown implements the proto.MachineServiceClient interface.
 func (c *Client) Shutdown(ctx context.Context) (err error) {
-	resp, err := c.MachineClient.Shutdown(ctx, &empty.Empty{})
+	resp, err := c.MachineClient.Shutdown(ctx, &emptypb.Empty{})
 
 	if err == nil {
 		_, err = FilterMessages(resp, err)
@@ -536,13 +558,13 @@ func (c *Client) Logs(ctx context.Context, namespace string, driver common.Conta
 func (c *Client) Version(ctx context.Context, callOptions ...grpc.CallOption) (resp *machineapi.VersionResponse, err error) {
 	resp, err = c.MachineClient.Version(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.VersionResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.VersionResponse) //nolint:errcheck
 
 	return
 }
@@ -551,13 +573,13 @@ func (c *Client) Version(ctx context.Context, callOptions ...grpc.CallOption) (r
 func (c *Client) Routes(ctx context.Context, callOptions ...grpc.CallOption) (resp *networkapi.RoutesResponse, err error) {
 	resp, err = c.NetworkClient.Routes(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*networkapi.RoutesResponse) //nolint: errcheck
+	resp, _ = filtered.(*networkapi.RoutesResponse) //nolint:errcheck
 
 	return
 }
@@ -566,13 +588,13 @@ func (c *Client) Routes(ctx context.Context, callOptions ...grpc.CallOption) (re
 func (c *Client) Interfaces(ctx context.Context, callOptions ...grpc.CallOption) (resp *networkapi.InterfacesResponse, err error) {
 	resp, err = c.NetworkClient.Interfaces(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*networkapi.InterfacesResponse) //nolint: errcheck
+	resp, _ = filtered.(*networkapi.InterfacesResponse) //nolint:errcheck
 
 	return
 }
@@ -581,13 +603,13 @@ func (c *Client) Interfaces(ctx context.Context, callOptions ...grpc.CallOption)
 func (c *Client) Processes(ctx context.Context, callOptions ...grpc.CallOption) (resp *machineapi.ProcessesResponse, err error) {
 	resp, err = c.MachineClient.Processes(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ProcessesResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ProcessesResponse) //nolint:errcheck
 
 	return
 }
@@ -596,13 +618,13 @@ func (c *Client) Processes(ctx context.Context, callOptions ...grpc.CallOption) 
 func (c *Client) Memory(ctx context.Context, callOptions ...grpc.CallOption) (resp *machineapi.MemoryResponse, err error) {
 	resp, err = c.MachineClient.Memory(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.MemoryResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.MemoryResponse) //nolint:errcheck
 
 	return
 }
@@ -611,13 +633,13 @@ func (c *Client) Memory(ctx context.Context, callOptions ...grpc.CallOption) (re
 func (c *Client) Mounts(ctx context.Context, callOptions ...grpc.CallOption) (resp *machineapi.MountsResponse, err error) {
 	resp, err = c.MachineClient.Mounts(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.MountsResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.MountsResponse) //nolint:errcheck
 
 	return
 }
@@ -646,20 +668,21 @@ func (c *Client) Copy(ctx context.Context, rootPath string) (io.ReadCloser, <-ch
 
 // Upgrade initiates a Talos upgrade ... and implements the proto.MachineServiceClient
 // interface.
-func (c *Client) Upgrade(ctx context.Context, image string, preserve, stage bool, callOptions ...grpc.CallOption) (resp *machineapi.UpgradeResponse, err error) {
+func (c *Client) Upgrade(ctx context.Context, image string, preserve, stage, force bool, callOptions ...grpc.CallOption) (resp *machineapi.UpgradeResponse, err error) {
 	resp, err = c.MachineClient.Upgrade(
 		ctx,
 		&machineapi.UpgradeRequest{
 			Image:    image,
 			Preserve: preserve,
 			Stage:    stage,
+			Force:    force,
 		},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.UpgradeResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.UpgradeResponse) //nolint:errcheck
 
 	return
 }
@@ -668,13 +691,13 @@ func (c *Client) Upgrade(ctx context.Context, image string, preserve, stage bool
 func (c *Client) ServiceList(ctx context.Context, callOptions ...grpc.CallOption) (resp *machineapi.ServiceListResponse, err error) {
 	resp, err = c.MachineClient.ServiceList(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ServiceListResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ServiceListResponse) //nolint:errcheck
 
 	return
 }
@@ -694,7 +717,7 @@ func (c *Client) ServiceInfo(ctx context.Context, id string, callOptions ...grpc
 
 	resp, err = c.MachineClient.ServiceList(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
@@ -704,7 +727,7 @@ func (c *Client) ServiceInfo(ctx context.Context, id string, callOptions ...grpc
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ServiceListResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ServiceListResponse) //nolint:errcheck
 
 	// FilterMessages might remove responses if they actually contain errors,
 	// errors will be merged into `resp`.
@@ -736,7 +759,7 @@ func (c *Client) ServiceStart(ctx context.Context, id string, callOptions ...grp
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ServiceStartResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ServiceStartResponse) //nolint:errcheck
 
 	return
 }
@@ -751,7 +774,7 @@ func (c *Client) ServiceStop(ctx context.Context, id string, callOptions ...grpc
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ServiceStopResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ServiceStopResponse) //nolint:errcheck
 
 	return
 }
@@ -766,7 +789,7 @@ func (c *Client) ServiceRestart(ctx context.Context, id string, callOptions ...g
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*machineapi.ServiceRestartResponse) //nolint: errcheck
+	resp, _ = filtered.(*machineapi.ServiceRestartResponse) //nolint:errcheck
 
 	return
 }
@@ -775,13 +798,13 @@ func (c *Client) ServiceRestart(ctx context.Context, id string, callOptions ...g
 func (c *Client) Time(ctx context.Context, callOptions ...grpc.CallOption) (resp *timeapi.TimeResponse, err error) {
 	resp, err = c.TimeClient.Time(
 		ctx,
-		&empty.Empty{},
+		&emptypb.Empty{},
 		callOptions...,
 	)
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*timeapi.TimeResponse) //nolint: errcheck
+	resp, _ = filtered.(*timeapi.TimeResponse) //nolint:errcheck
 
 	return
 }
@@ -796,7 +819,7 @@ func (c *Client) TimeCheck(ctx context.Context, server string, callOptions ...gr
 
 	var filtered interface{}
 	filtered, err = FilterMessages(resp, err)
-	resp, _ = filtered.(*timeapi.TimeResponse) //nolint: errcheck
+	resp, _ = filtered.(*timeapi.TimeResponse) //nolint:errcheck
 
 	return
 }
@@ -819,6 +842,106 @@ func (c *Client) ClusterHealthCheck(ctx context.Context, waitTimeout time.Durati
 	})
 }
 
+// EtcdRemoveMember removes a node from etcd cluster.
+func (c *Client) EtcdRemoveMember(ctx context.Context, req *machineapi.EtcdRemoveMemberRequest, callOptions ...grpc.CallOption) error {
+	resp, err := c.MachineClient.EtcdRemoveMember(ctx, req, callOptions...)
+
+	if err == nil {
+		_, err = FilterMessages(resp, err)
+	}
+
+	return err
+}
+
+// EtcdLeaveCluster makes node leave etcd cluster.
+func (c *Client) EtcdLeaveCluster(ctx context.Context, req *machineapi.EtcdLeaveClusterRequest, callOptions ...grpc.CallOption) error {
+	resp, err := c.MachineClient.EtcdLeaveCluster(ctx, req, callOptions...)
+
+	if err == nil {
+		_, err = FilterMessages(resp, err)
+	}
+
+	return err
+}
+
+// EtcdForfeitLeadership makes node forfeit leadership in the etcd cluster.
+func (c *Client) EtcdForfeitLeadership(ctx context.Context, req *machineapi.EtcdForfeitLeadershipRequest, callOptions ...grpc.CallOption) (*machineapi.EtcdForfeitLeadershipResponse, error) {
+	resp, err := c.MachineClient.EtcdForfeitLeadership(ctx, req, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*machineapi.EtcdForfeitLeadershipResponse) //nolint:errcheck
+
+	return resp, err
+}
+
+// EtcdMemberList lists etcd members of the cluster.
+func (c *Client) EtcdMemberList(ctx context.Context, req *machineapi.EtcdMemberListRequest, callOptions ...grpc.CallOption) (*machineapi.EtcdMemberListResponse, error) {
+	resp, err := c.MachineClient.EtcdMemberList(ctx, req, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*machineapi.EtcdMemberListResponse) //nolint:errcheck
+
+	return resp, err
+}
+
+// EtcdSnapshot receives a snapshot of the etcd from the node.
+func (c *Client) EtcdSnapshot(ctx context.Context, req *machineapi.EtcdSnapshotRequest, callOptions ...grpc.CallOption) (io.ReadCloser, <-chan error, error) {
+	stream, err := c.MachineClient.EtcdSnapshot(ctx, req, callOptions...)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return ReadStream(stream)
+}
+
+// EtcdRecover uploads etcd snapshot created with EtcdSnapshot to the node.
+func (c *Client) EtcdRecover(ctx context.Context, snapshot io.Reader, callOptions ...grpc.CallOption) (*machineapi.EtcdRecoverResponse, error) {
+	cli, err := c.MachineClient.EtcdRecover(ctx, callOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	buf := make([]byte, 4096)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		n, err := snapshot.Read(buf)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+
+			return nil, fmt.Errorf("error reading snapshot: %w", err)
+		}
+
+		if err = cli.Send(&common.Data{
+			Bytes: buf[:n],
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	return cli.CloseAndRecv()
+}
+
+// GenerateClientConfiguration implements proto.MachineServiceClient interface.
+func (c *Client) GenerateClientConfiguration(ctx context.Context, req *machineapi.GenerateClientConfigurationRequest, callOptions ...grpc.CallOption) (resp *machineapi.GenerateClientConfigurationResponse, err error) { //nolint:lll
+	resp, err = c.MachineClient.GenerateClientConfiguration(ctx, req, callOptions...)
+
+	var filtered interface{}
+	filtered, err = FilterMessages(resp, err)
+	resp, _ = filtered.(*machineapi.GenerateClientConfigurationResponse) //nolint:errcheck
+
+	return
+}
+
 // MachineStream is a common interface for streams returned by streaming APIs.
 type MachineStream interface {
 	Recv() (*common.Data, error)
@@ -831,17 +954,17 @@ func ReadStream(stream MachineStream) (io.ReadCloser, <-chan error, error) {
 	pr, pw := io.Pipe()
 
 	go func() {
-		//nolint: errcheck
+		//nolint:errcheck
 		defer pw.Close()
 		defer close(errCh)
 
 		for {
 			data, err := stream.Recv()
 			if err != nil {
-				if err == io.EOF || status.Code(err) == codes.Canceled {
+				if err == io.EOF || StatusCode(err) == codes.Canceled {
 					return
 				}
-				//nolint: errcheck
+				//nolint:errcheck
 				pw.CloseWithError(err)
 
 				return
