@@ -1,7 +1,7 @@
 package main
 
 import (
-	tvmtoolsd "github.com/mologie/talos-vmtoolsd"
+	vmtoolsd "github.com/mologie/talos-vmtoolsd"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/mologie/talos-vmtoolsd/internal/talosapi"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
@@ -34,7 +34,7 @@ func main() {
 	l.Infof("talos-vmtoolsd version %v\n"+
 		"Copyright 2020-2021 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
 		"This program is free software and available under the Apache 2.0 license.",
-		tvmtoolsd.Version)
+		vmtoolsd.Version)
 
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
