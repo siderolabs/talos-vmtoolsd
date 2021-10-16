@@ -28,7 +28,7 @@ rm vmtoolsd-secret.yaml
 Install or upgrade `talos-vmtoolsd`:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/mologie/talos-vmtoolsd/master/deploy/unstable.yaml
+kubectl apply -f https://raw.githubusercontent.com/mologie/talos-vmtoolsd/release-0.2/deploy/0.2.yaml
 ```
 
 # Roadmap
