@@ -1,4 +1,4 @@
-FROM golang:1.17.2-alpine AS builder
+FROM golang:1.17.6-alpine AS builder
 WORKDIR /build
 COPY . .
 ARG CGO_ENABLED=0
