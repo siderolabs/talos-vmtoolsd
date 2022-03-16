@@ -30,7 +30,7 @@ const maxNICs = 16
 type NetInterface struct {
 	Name  string
 	MAC   string // xx:xx:xx:xx:xx:xx
-	Addrs []net.Addr
+	Addrs []*net.IPNet
 }
 
 type NicDelegate interface {
@@ -57,12 +57,7 @@ func (cmd *GuestInfoCommands) PrimaryIP() string {
 		cmd.log.Warn("not sending primary IP: first upstream adapter has no addresses")
 		return unknownIP
 	}
-	ipnet, ok := addrs[0].(*net.IPNet)
-	if !ok {
-		cmd.log.Warn("not sending primary IP: expected first upstream IP with type net.IPNet")
-		return unknownIP
-	}
-	return ipnet.IP.String()
+	return addrs[0].IP.String()
 }
 
 func (cmd *GuestInfoCommands) GuestNicInfo() *GuestNicInfo {

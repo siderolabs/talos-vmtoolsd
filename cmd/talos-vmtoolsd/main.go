@@ -1,6 +1,8 @@
 package main
 
 import (
+	"flag"
+	"fmt"
 	vmtoolsd "github.com/mologie/talos-vmtoolsd"
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/mologie/talos-vmtoolsd/internal/talosapi"
@@ -20,6 +22,11 @@ func main() {
 		DisableHTMLEscape: true,
 	})
 
+	// Debug flags
+	talosTestQuery := ""
+	flag.StringVar(&talosTestQuery, "test-apid-query", "", "query apid")
+	flag.Parse()
+
 	// Apply log level, default to "info"
 	if levelStr, ok := os.LookupEnv("LOG_LEVEL"); ok {
 		if level, err := logrus.ParseLevel(levelStr); err != nil {
@@ -32,7 +39,7 @@ func main() {
 	}
 
 	l.Infof("talos-vmtoolsd version %v\n"+
-		"Copyright 2020-2021 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
+		"Copyright 2020-2022 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
 		"This program is free software and available under the Apache 2.0 license.",
 		vmtoolsd.Version)
 
@@ -55,10 +62,7 @@ func main() {
 		l.Fatal("error: TALOS_HOST is required to point to a node's internal IP")
 	}
 
-	// Wires up VMware Toolbox commands to Talos apid.
-	vmguestmsg.DefaultLogger = l.WithField("module", "vmware-guestinfo")
-	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair()
-	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
+	// Connect to Talos apid
 	api, err := talosapi.NewLocalClient(l, configPath, k8sHost)
 	if err != nil {
 		l.WithError(err).Fatal("could not connect to apid")
@@ -68,6 +72,21 @@ func main() {
 			l.WithError(err).Warn("failed to close API client during process shutdown")
 		}
 	}()
+
+	// Manual test query mode for Talos apid client
+	if talosTestQuery != "" {
+		if err := testQuery(api, talosTestQuery); err != nil {
+			l.WithField("test_query", talosTestQuery).WithError(err).Fatal("test query failed")
+			os.Exit(1)
+		} else {
+			os.Exit(0)
+		}
+	}
+
+	// Wires up VMware Toolbox commands to Talos apid.
+	vmguestmsg.DefaultLogger = l.WithField("module", "vmware-guestinfo")
+	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair()
+	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
 	tboxcmds.RegisterGuestInfoCommands(svc, api)
 	tboxcmds.RegisterPowerDelegate(svc, api)
 	tboxcmds.RegisterVixCommand(svc, api)
@@ -86,4 +105,28 @@ func main() {
 	}()
 	svc.Wait()
 	l.Info("graceful shutdown done, fair winds!")
+}
+
+func testQuery(api *talosapi.LocalClient, query string) error {
+	w := os.Stdout
+	switch query {
+	case "net-interfaces":
+		for idx, intf := range api.NetInterfaces() {
+			for _, addr := range intf.Addrs {
+				_, _ = fmt.Fprintf(w, "%d: name=%s mac=%s addr=%s\n", idx, intf.Name, intf.MAC, addr)
+			}
+		}
+		return nil
+	case "hostname":
+		_, _ = fmt.Fprintln(w, api.Hostname())
+		return nil
+	case "os-version":
+		_, _ = fmt.Fprintln(w, api.OSVersion())
+		return nil
+	case "os-version-short":
+		_, _ = fmt.Fprintln(w, api.OSVersionShort())
+		return nil
+	default:
+		return fmt.Errorf("unknown test query %q", query)
+	}
 }

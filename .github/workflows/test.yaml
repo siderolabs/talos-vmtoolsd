@@ -1,0 +1,11 @@
+name: Test
+on: [pull_request]
+jobs:
+  test_container:
+    name: Build a container test image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone repository
+        uses: actions/checkout@v2
+      - name: Docker
+        run: docker build . --file Dockerfile --tag talos-vmtoolsd:test

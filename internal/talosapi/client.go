@@ -7,10 +7,13 @@ import (
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
 	"github.com/sirupsen/logrus"
 	"github.com/talos-systems/talos/pkg/machinery/api/machine"
+	resourceapi "github.com/talos-systems/talos/pkg/machinery/api/resource"
 	talosclient "github.com/talos-systems/talos/pkg/machinery/client"
 	talosconfig "github.com/talos-systems/talos/pkg/machinery/client/config"
-	"net"
-	"regexp"
+	"github.com/talos-systems/talos/pkg/resources/network"
+	"gopkg.in/yaml.v2"
+	"inet.af/netaddr"
+	"io"
 )
 
 type LocalClient struct {
@@ -20,8 +23,6 @@ type LocalClient struct {
 	k8sHost    string
 	api        *talosclient.Client
 }
-
-var PhysIntfRegex = regexp.MustCompile("^eth[0-9]+$")
 
 func (c *LocalClient) Close() error {
 	return c.api.Close()
@@ -89,29 +90,95 @@ func (c *LocalClient) Hostname() string {
 }
 
 func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
-	resp, err := c.api.Interfaces(c.ctx)
-	if err != nil || len(resp.Messages) == 0 {
-		c.log.WithError(err).Error("error retrieving network interface list")
+	// TODO: There does not appear proper built-in unmarshalling to API objects such as
+	//   network.AddressStatus yet. All we get back is YAML. Additionally Talos' nethelpers
+	//   supports marshalling only which blocks reusing existing object definitions for decoding.
+	//   Meh.
+
+	type AddressStatusSpec struct {
+		Address  netaddr.IPPrefix `yaml:"address"`
+		LinkName string           `yaml:"linkName"`
+	}
+
+	type LinkStatusSpec struct {
+		Type         string `yaml:"type"`
+		HardwareAddr string `yaml:"hardwareAddr"`
+		Kind         string `yaml:"kind"`
+	}
+
+	addrMap := make(map[string][]AddressStatusSpec)
+	addrClient, err := c.api.ResourceClient.List(c.ctx, &resourceapi.ListRequest{
+		Namespace: network.NamespaceName,
+		Type:      network.AddressStatusType,
+	})
+	if err != nil {
+		c.log.WithError(err).Error("error listing address status resources")
 		return nil
 	}
-	ifs := resp.Messages[0].Interfaces
-	for _, nic := range ifs {
-		if PhysIntfRegex.MatchString(nic.Name) {
-			wrappedIf := tboxcmds.NetInterface{
-				Name: nic.Name,
-				MAC:  nic.Hardwareaddr,
-			}
-			for _, ip := range nic.Ipaddress {
-				ip, cidr, err := net.ParseCIDR(ip)
-				if err != nil {
-					continue
-				}
-				cidr.IP = ip
-				wrappedIf.Addrs = append(wrappedIf.Addrs, cidr)
-			}
-			result = append(result, wrappedIf)
+
+	for {
+		msg, err := addrClient.Recv()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			c.log.WithError(err).Error("error receiving address status resource")
+			return nil
 		}
+		if msg.Resource == nil {
+			continue
+		}
+		var spec AddressStatusSpec
+		if err := yaml.Unmarshal(msg.Resource.Spec.Yaml, &spec); err != nil {
+			c.log.WithError(err).Error("error decoding address status resource")
+			continue
+		}
+		addrMap[spec.LinkName] = append(addrMap[spec.LinkName], spec)
 	}
+
+	linkClient, err := c.api.ResourceClient.List(c.ctx, &resourceapi.ListRequest{
+		Namespace: network.NamespaceName,
+		Type:      network.LinkStatusType,
+	})
+	if err != nil {
+		c.log.WithError(err).Error("error listing link status resources")
+		return nil
+	}
+
+	for {
+		msg, err := linkClient.Recv()
+		if err == io.EOF {
+			break
+		} else if err != nil {
+			c.log.WithError(err).Error("error receiving link status resource")
+			return nil
+		}
+		if msg.Resource == nil {
+			continue
+		}
+
+		var spec LinkStatusSpec
+		if err := yaml.Unmarshal(msg.Resource.Spec.Yaml, &spec); err != nil {
+			c.log.WithError(err).Error("error decoding link status resource")
+			continue
+		}
+
+		// via: network.LinkStatus.Physical()
+		if spec.Type != "ether" || spec.Kind != "" {
+			continue
+		}
+
+		intf := tboxcmds.NetInterface{
+			Name: msg.Resource.Metadata.Id,
+			MAC:  spec.HardwareAddr,
+		}
+
+		for _, addr := range addrMap[intf.Name] {
+			intf.Addrs = append(intf.Addrs, addr.Address.IPNet())
+		}
+
+		result = append(result, intf)
+	}
+
 	return
 }
 

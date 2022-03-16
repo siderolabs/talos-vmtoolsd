@@ -72,20 +72,15 @@ type GuestNicInfo struct {
 	V3      *NicInfoV3 `xdr:"optional"`
 }
 
-func (nic *GuestNicV3) AddIP(addr net.Addr) {
-	ip, ok := addr.(*net.IPNet)
-	if !ok {
-		return
-	}
-
+func (nic *GuestNicV3) AddIP(ipnet *net.IPNet) {
 	kind := int32(1) // IAT_IPV4
-	if ip.IP.To4() == nil {
+	if ipnet.IP.To4() == nil {
 		kind = 2 // IAT_IPV6
 	} else {
-		ip.IP = ip.IP.To4() // convert to 4-byte representation
+		ipnet.IP = ipnet.IP.To4() // convert to 4-byte representation
 	}
 
-	size, _ := ip.Mask.Size()
+	size, _ := ipnet.Mask.Size()
 
 	// nicinfo.x defines enum IpAddressStatus, but vmtoolsd only uses IAS_PREFERRED
 	var status int32 = 1 // IAS_PREFERRED
@@ -93,7 +88,7 @@ func (nic *GuestNicV3) AddIP(addr net.Addr) {
 	e := IPAddressEntry{
 		Address: TypedIPAddress{
 			Type:    kind,
-			Address: []byte(ip.IP),
+			Address: []byte(ipnet.IP),
 		},
 		PrefixLength: uint32(size),
 		Status:       &status,
