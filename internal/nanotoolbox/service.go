@@ -226,11 +226,7 @@ func (s *Service) Dispatch(request []byte) []byte {
 
 	if !ok {
 		l.Debug("unknown command")
-<<<<<<< HEAD
-		return []byte("Unknown Command")
-=======
 		return []byte("ERROR Unknown Command")
->>>>>>> b3ccb78 (Use "ERROR" instead of "ERR" when replying failed commands)
 	}
 
 	var args []byte
