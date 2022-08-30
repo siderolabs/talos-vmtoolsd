@@ -16,16 +16,20 @@ jobs:
     steps:
       - name: Clone repository
         uses: actions/checkout@v2
-
+      - name: Login to GHCR
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
       # publish tags to talos-vmtoolsd:version and talos-vmtoolsd:latest
       # publish branches to talos-vmtoolsd-unstable:branch
       # based on https://medium.com/cooking-with-azure/4e39700ae14c
       - name: Publish
         run: |
-          echo "${{ secrets.CR_PAT }}" | docker login https://ghcr.io -u "${{ github.actor }}" --password-stdin
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
           if [[ "${{ github.ref }}" == "refs/tags/"* ]]; then
-            IMGPATH=ghcr.io/mologie/talos-vmtoolsd
+            IMGPATH=ghcr.io/${{ github.repository }}
             VERSION=$(echo $VERSION | sed -e 's/^v//')
             docker build . -t $IMGPATH:$VERSION -t $IMGPATH:latest
             docker push $IMGPATH:$VERSION
