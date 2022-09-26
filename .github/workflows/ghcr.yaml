@@ -24,7 +24,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       # publish tags to talos-vmtoolsd:version and talos-vmtoolsd:latest
       # publish branches to talos-vmtoolsd-unstable:branch
-      # based on https://medium.com/cooking-with-azure/4e39700ae14c
+      # requires GitHub actions access to packages to be configured
       - name: Publish
         run: |
           VERSION=$(echo "${{ github.ref }}" | sed -e 's,.*/\(.*\),\1,')
@@ -35,7 +35,7 @@ jobs:
             docker push $IMGPATH:$VERSION
             docker push $IMGPATH:latest
           else
-            IMGPATH=ghcr.io/mologie/talos-vmtoolsd-unstable
+            IMGPATH=ghcr.io/${{ github.repository }}-unstable
             [ "$VERSION" == "master" ] && VERSION=latest
             docker build . -t $IMGPATH:$VERSION
             docker push $IMGPATH:$VERSION
