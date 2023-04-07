@@ -1,0 +1,10 @@
+version: v1alpha1
+metadata:
+  name: talos-vmtoolsd
+  version: "v1.0.0"
+  author: Brandon Nason
+  description: |
+    This system extension provides talos-vmtoolsd
+  compatibility:
+    talos:
+      version: ">= v1.0.0"
