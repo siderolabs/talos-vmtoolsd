@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+
 	vmtoolsd "github.com/siderolabs/talos-vmtoolsd"
 	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosapi"
@@ -10,9 +15,6 @@ import (
 	"github.com/sirupsen/logrus"
 	vmguestmsg "github.com/vmware/vmw-guestinfo/message"
 	"github.com/vmware/vmw-guestinfo/vmcheck"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 func main() {
@@ -23,8 +25,10 @@ func main() {
 	})
 
 	// Debug flags
-	talosTestQuery := ""
+	var talosTestQuery string
+	var useMachinedSocket bool
 	flag.StringVar(&talosTestQuery, "test-apid-query", "", "query apid")
+	flag.BoolVar(&useMachinedSocket, "use-machined", false, "use machined unix socket")
 	flag.Parse()
 
 	// Apply log level, default to "info"
@@ -52,21 +56,34 @@ func main() {
 		select {}
 	}
 
-	// Our spec file passes the secret path and K8s host IP via env vars.
-	configPath := os.Getenv("TALOS_CONFIG_PATH")
-	if len(configPath) == 0 {
-		l.Fatal("error: TALOS_CONFIG_PATH is a required path to a Talos configuration file")
-	}
-	k8sHost := os.Getenv("TALOS_HOST")
-	if len(k8sHost) == 0 {
-		l.Fatal("error: TALOS_HOST is required to point to a node's internal IP")
+	ctx, ctxCancel := context.WithCancel(context.Background())
+
+	var api *talosapi.LocalClient
+	var err error
+	if !useMachinedSocket {
+		// Our spec file passes the secret path and K8s host IP via env vars.
+		configPath := os.Getenv("TALOS_CONFIG_PATH")
+		if len(configPath) == 0 {
+			l.Fatal("error: TALOS_CONFIG_PATH is a required path to a Talos configuration file")
+		}
+		k8sHost := os.Getenv("TALOS_HOST")
+		if len(k8sHost) == 0 {
+			l.Fatal("error: TALOS_HOST is required to point to a node's internal IP")
+		}
+
+		// Connect to Talos apid
+		api, err = talosapi.NewLocalClient(ctx, l, configPath, k8sHost)
+		if err != nil {
+			l.WithError(err).Fatal("could not connect to apid")
+		}
+	} else {
+		// Connect to Talos machined
+		api, err = talosapi.NewLocalSocketClient(ctx, l)
+		if err != nil {
+			l.WithError(err).Fatal("could not connect to machined socket")
+		}
 	}
 
-	// Connect to Talos apid
-	api, err := talosapi.NewLocalClient(l, configPath, k8sHost)
-	if err != nil {
-		l.WithError(err).Fatal("could not connect to apid")
-	}
 	defer func() {
 		if err := api.Close(); err != nil {
 			l.WithError(err).Warn("failed to close API client during process shutdown")
@@ -101,6 +118,7 @@ func main() {
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
 		l.Debugf("signal: %s", <-sig)
+		ctxCancel()
 		svc.Stop()
 	}()
 	svc.Wait()

@@ -3,37 +3,57 @@ package talosapi
 import (
 	"context"
 	"fmt"
+
 	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/siderolabs/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/siderolabs/talos/pkg/grpc/middleware/authz"
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	talosclient "github.com/siderolabs/talos/pkg/machinery/client"
 	talosconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
+	talosconstants "github.com/siderolabs/talos/pkg/machinery/constants"
 	"github.com/siderolabs/talos/pkg/machinery/resources/network"
+	talosrole "github.com/siderolabs/talos/pkg/machinery/role"
 	"github.com/sirupsen/logrus"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type LocalClient struct {
-	ctx        context.Context
-	log        logrus.FieldLogger
-	configPath string
-	k8sHost    string
-	api        *talosclient.Client
+	ctx context.Context
+	log logrus.FieldLogger
+	api *talosclient.Client
 }
 
 func (c *LocalClient) Close() error {
 	return c.api.Close()
 }
 
-func (c *LocalClient) connect() (*talosclient.Client, error) {
-	cfg, err := talosconfig.Open(c.configPath)
+func (c *LocalClient) connectToApid(configPath string, k8sHost string) (*talosclient.Client, error) {
+	cfg, err := talosconfig.Open(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open config file %q: %w", c.configPath, err)
+		return nil, fmt.Errorf("failed to open config file %q: %w", configPath, err)
 	}
 	opts := []talosclient.OptionFunc{
 		talosclient.WithConfig(cfg),
-		talosclient.WithEndpoints(c.k8sHost),
+		talosclient.WithEndpoints(k8sHost),
 	}
+	api, err := talosclient.New(c.ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to construct client: %w", err)
+	}
+	return api, nil
+}
+
+func (c *LocalClient) connectToMachined() (*talosclient.Client, error) {
+	opts := []talosclient.OptionFunc{
+		talosclient.WithUnixSocket(talosconstants.MachineSocketPath),
+		talosclient.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
+	}
+	md := metadata.New(nil)
+	authz.SetMetadata(md, talosrole.MakeSet(talosrole.Admin))
+	c.ctx = metadata.NewOutgoingContext(c.ctx, md)
 	api, err := talosclient.New(c.ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to construct client: %w", err)
@@ -131,17 +151,28 @@ func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
 	return
 }
 
-func NewLocalClient(log logrus.FieldLogger, configPath string, k8sHost string) (*LocalClient, error) {
+func NewLocalClient(ctx context.Context, log logrus.FieldLogger, configPath string, k8sHost string) (*LocalClient, error) {
 	var err error
 	c := &LocalClient{
-		ctx:        context.Background(),
-		log:        log.WithField("module", "talosapi"),
-		configPath: configPath,
-		k8sHost:    k8sHost,
+		ctx: ctx,
+		log: log.WithField("module", "talosapi"),
 	}
-	c.api, err = c.connect()
+	c.api, err = c.connectToApid(configPath, k8sHost)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to apid: %v", err)
+	}
+	return c, nil
+}
+
+func NewLocalSocketClient(ctx context.Context, log logrus.FieldLogger) (*LocalClient, error) {
+	var err error
+	c := &LocalClient{
+		ctx: ctx,
+		log: log.WithField("module", "talosapi"),
+	}
+	c.api, err = c.connectToMachined()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to machined: %v", err)
 	}
 	return c, nil
 }
