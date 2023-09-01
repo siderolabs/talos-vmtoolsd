@@ -1,8 +1,9 @@
-FROM golang:1.17.8-alpine AS builder
+FROM golang:1.21.0-alpine AS builder
 WORKDIR /build
 COPY . .
+ARG TARGETARCH
 ARG CGO_ENABLED=0
-ARG GOARCH=amd64
+ARG GOARCH=$TARGETARCH
 ARG GOOS=linux
 RUN go test -v ./... && \
     go vet ./... && \

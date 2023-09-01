@@ -6,7 +6,7 @@ import (
 	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/sirupsen/logrus"
 	xdr "github.com/stellar/go-xdr/xdr3"
-	"net"
+	"net/netip"
 )
 
 const (
@@ -30,7 +30,7 @@ const maxNICs = 16
 type NetInterface struct {
 	Name  string
 	MAC   string // xx:xx:xx:xx:xx:xx
-	Addrs []*net.IPNet
+	Addrs []netip.Prefix
 }
 
 type NicDelegate interface {
@@ -57,7 +57,7 @@ func (cmd *GuestInfoCommands) PrimaryIP() string {
 		cmd.log.Warn("not sending primary IP: first upstream adapter has no addresses")
 		return unknownIP
 	}
-	return addrs[0].IP.String()
+	return addrs[0].String()
 }
 
 func (cmd *GuestInfoCommands) GuestNicInfo() *GuestNicInfo {
