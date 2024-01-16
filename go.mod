@@ -1,10 +1,10 @@
 module github.com/siderolabs/talos-vmtoolsd
 
-go 1.17
+go 1.21.0
 
 require (
-	github.com/golang/protobuf v1.5.2
-	github.com/sirupsen/logrus v1.8.1
+	github.com/golang/protobuf v1.5.3
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stellar/go-xdr v0.0.0-20211103144802-8017fc4bdfee
 	github.com/talos-systems/talos v0.13.0
 	github.com/talos-systems/talos/pkg/machinery v0.14.0
@@ -35,12 +35,12 @@ require (
 	github.com/talos-systems/crypto v0.3.4 // indirect
 	github.com/talos-systems/net v0.3.1 // indirect
 	go4.org/intern v0.0.0-20211027215823-ae77deb06f29 // indirect
-	go4.org/unsafe/assume-no-moving-gc v0.0.0-20211027215541-db492cf91b37 // indirect
+	go4.org/unsafe/assume-no-moving-gc v0.0.0-20231121144256-b99613f794b6 // indirect
 	golang.org/x/crypto v0.0.0-20211215153901-e495a2d5b3d3 // indirect
 	golang.org/x/mod v0.5.1 // indirect
 	golang.org/x/net v0.0.0-20211216030914-fe4d6282115f // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e // indirect
+	golang.org/x/sys v0.16.0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.8 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect

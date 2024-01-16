@@ -1,9 +1,10 @@
-FROM golang:1.17.8-alpine AS builder
+FROM golang:1.21.6-alpine AS builder
 WORKDIR /build
 COPY . .
 ARG CGO_ENABLED=0
 ARG GOARCH=amd64
 ARG GOOS=linux
+ARG GOTOOLCHAIN=local
 RUN go test -v ./... && \
     go vet ./... && \
     go build -ldflags="-s -w" -trimpath -o talos-vmtoolsd ./cmd/talos-vmtoolsd
