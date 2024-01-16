@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/siderolabs/talos-vmtoolsd/internal/tboxcmds"
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	talosclient "github.com/siderolabs/talos/pkg/machinery/client"
 	talosconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
