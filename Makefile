@@ -1,4 +1,7 @@
+# For development only.
+# This Makefile is not being used by Dockerfile.
+
 talos-vmtoolsd:
-	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -trimpath -o $@ ./cmd/$@
+	go build -ldflags="-s -w" -trimpath -o $@ ./cmd/$@
 
 .PHONY: talos-vmtoolsd

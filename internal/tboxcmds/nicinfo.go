@@ -18,7 +18,7 @@ limitations under the License.
 
 package tboxcmds
 
-import "net"
+import "net/netip"
 
 type TypedIPAddress struct {
 	Type    int32
@@ -72,15 +72,14 @@ type GuestNicInfo struct {
 	V3      *NicInfoV3 `xdr:"optional"`
 }
 
-func (nic *GuestNicV3) AddIP(ipnet *net.IPNet) {
+func (nic *GuestNicV3) AddIP(prefix netip.Prefix) {
+	addr := prefix.Addr()
 	kind := int32(1) // IAT_IPV4
-	if ipnet.IP.To4() == nil {
+	if addr.Is6() {
 		kind = 2 // IAT_IPV6
-	} else {
-		ipnet.IP = ipnet.IP.To4() // convert to 4-byte representation
+	} else if addr.Is4In6() {
+		addr = netip.AddrFrom4(addr.As4()) // convert to 4-byte representation
 	}
-
-	size, _ := ipnet.Mask.Size()
 
 	// nicinfo.x defines enum IpAddressStatus, but vmtoolsd only uses IAS_PREFERRED
 	var status int32 = 1 // IAS_PREFERRED
@@ -88,9 +87,9 @@ func (nic *GuestNicV3) AddIP(ipnet *net.IPNet) {
 	e := IPAddressEntry{
 		Address: TypedIPAddress{
 			Type:    kind,
-			Address: []byte(ipnet.IP),
+			Address: addr.AsSlice(),
 		},
-		PrefixLength: uint32(size),
+		PrefixLength: uint32(prefix.Bits()),
 		Status:       &status,
 	}
 

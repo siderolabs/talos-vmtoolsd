@@ -3,17 +3,14 @@ package talosapi
 import (
 	"context"
 	"fmt"
+	"github.com/cosi-project/runtime/pkg/resource"
 	"github.com/golang/protobuf/ptypes/empty"
 	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/siderolabs/talos/pkg/machinery/api/machine"
+	talosclient "github.com/siderolabs/talos/pkg/machinery/client"
+	talosconfig "github.com/siderolabs/talos/pkg/machinery/client/config"
+	"github.com/siderolabs/talos/pkg/machinery/resources/network"
 	"github.com/sirupsen/logrus"
-	"github.com/talos-systems/talos/pkg/machinery/api/machine"
-	resourceapi "github.com/talos-systems/talos/pkg/machinery/api/resource"
-	talosclient "github.com/talos-systems/talos/pkg/machinery/client"
-	talosconfig "github.com/talos-systems/talos/pkg/machinery/client/config"
-	"github.com/talos-systems/talos/pkg/resources/network"
-	"gopkg.in/yaml.v2"
-	"inet.af/netaddr"
-	"io"
 )
 
 type LocalClient struct {
@@ -90,92 +87,44 @@ func (c *LocalClient) Hostname() string {
 }
 
 func (c *LocalClient) NetInterfaces() (result []tboxcmds.NetInterface) {
-	// TODO: There does not appear proper built-in unmarshalling to API objects such as
-	//   network.AddressStatus yet. All we get back is YAML. Additionally Talos' nethelpers
-	//   supports marshalling only which blocks reusing existing object definitions for decoding.
-	//   Meh.
-
-	type AddressStatusSpec struct {
-		Address  netaddr.IPPrefix `yaml:"address"`
-		LinkName string           `yaml:"linkName"`
-	}
-
-	type LinkStatusSpec struct {
-		Type         string `yaml:"type"`
-		HardwareAddr string `yaml:"hardwareAddr"`
-		Kind         string `yaml:"kind"`
-	}
-
-	addrMap := make(map[string][]AddressStatusSpec)
-	addrClient, err := c.api.ResourceClient.List(c.ctx, &resourceapi.ListRequest{
-		Namespace: network.NamespaceName,
-		Type:      network.AddressStatusType,
-	})
+	addrMap := make(map[string][]*network.AddressStatusSpec)
+	addrStatusMap, err := c.api.COSI.List(c.ctx, resource.NewMetadata(
+		network.NamespaceName,
+		network.AddressStatusType,
+		"",
+		resource.VersionUndefined,
+	))
 	if err != nil {
 		c.log.WithError(err).Error("error listing address status resources")
 		return nil
 	}
-
-	for {
-		msg, err := addrClient.Recv()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			c.log.WithError(err).Error("error receiving address status resource")
-			return nil
-		}
-		if msg.Resource == nil {
-			continue
-		}
-		var spec AddressStatusSpec
-		if err := yaml.Unmarshal(msg.Resource.Spec.Yaml, &spec); err != nil {
-			c.log.WithError(err).Error("error decoding address status resource")
-			continue
-		}
+	for _, res := range addrStatusMap.Items {
+		spec := res.(*network.AddressStatus).Spec().(*network.AddressStatusSpec)
 		addrMap[spec.LinkName] = append(addrMap[spec.LinkName], spec)
 	}
 
-	linkClient, err := c.api.ResourceClient.List(c.ctx, &resourceapi.ListRequest{
-		Namespace: network.NamespaceName,
-		Type:      network.LinkStatusType,
-	})
+	linkStatusList, err := c.api.COSI.List(c.ctx, resource.NewMetadata(
+		network.NamespaceName,
+		network.LinkStatusType,
+		"",
+		resource.VersionUndefined,
+	))
 	if err != nil {
 		c.log.WithError(err).Error("error listing link status resources")
 		return nil
 	}
-
-	for {
-		msg, err := linkClient.Recv()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			c.log.WithError(err).Error("error receiving link status resource")
-			return nil
-		}
-		if msg.Resource == nil {
+	for _, res := range linkStatusList.Items {
+		spec := res.(*network.LinkStatus).Spec().(*network.LinkStatusSpec)
+		if !spec.Physical() {
 			continue
 		}
-
-		var spec LinkStatusSpec
-		if err := yaml.Unmarshal(msg.Resource.Spec.Yaml, &spec); err != nil {
-			c.log.WithError(err).Error("error decoding link status resource")
-			continue
-		}
-
-		// via: network.LinkStatus.Physical()
-		if spec.Type != "ether" || spec.Kind != "" {
-			continue
-		}
-
 		intf := tboxcmds.NetInterface{
-			Name: msg.Resource.Metadata.Id,
-			MAC:  spec.HardwareAddr,
+			Name: res.Metadata().ID(),
+			MAC:  spec.HardwareAddr.String(),
 		}
-
 		for _, addr := range addrMap[intf.Name] {
-			intf.Addrs = append(intf.Addrs, addr.Address.IPNet())
+			intf.Addrs = append(intf.Addrs, addr.Address)
 		}
-
 		result = append(result, intf)
 	}
 
