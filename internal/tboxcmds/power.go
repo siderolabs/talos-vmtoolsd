@@ -2,7 +2,7 @@ package tboxcmds
 
 import (
 	"fmt"
-	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/sirupsen/logrus"
 )
 

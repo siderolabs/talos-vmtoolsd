@@ -3,7 +3,7 @@ package tboxcmds
 import (
 	"bytes"
 	"fmt"
-	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/sirupsen/logrus"
 	xdr "github.com/stellar/go-xdr/xdr3"
 	"net"

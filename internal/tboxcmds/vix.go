@@ -24,8 +24,8 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	tvmtoolsd "github.com/mologie/talos-vmtoolsd"
-	"github.com/mologie/talos-vmtoolsd/internal/nanotoolbox"
+	tvmtoolsd "github.com/siderolabs/talos-vmtoolsd"
+	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/toolbox/vix"
 )

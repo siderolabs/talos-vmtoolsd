@@ -1,4 +1,4 @@
-module github.com/mologie/talos-vmtoolsd
+module github.com/siderolabs/talos-vmtoolsd
 
 go 1.17
 

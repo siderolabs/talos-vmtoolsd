@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/golang/protobuf/ptypes/empty"
-	"github.com/mologie/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/siderolabs/talos-vmtoolsd/internal/tboxcmds"
 	"github.com/sirupsen/logrus"
 	"github.com/talos-systems/talos/pkg/machinery/api/machine"
 	resourceapi "github.com/talos-systems/talos/pkg/machinery/api/resource"
