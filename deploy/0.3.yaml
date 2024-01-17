@@ -29,8 +29,8 @@ spec:
           operator: Exists
           effect: NoSchedule
       containers:
-        # image digest via https://github.com/mologie/talos-vmtoolsd/pkgs/container/talos-vmtoolsd/43215519?tag=0.3.1
-        - image: ghcr.io/mologie/talos-vmtoolsd@sha256:cece8a312148ae50706b128a31b319addbabf1c6bc122ff9346904041a1c269d
+        # image digest via https://github.com/siderolabs/talos-vmtoolsd/pkgs/container/talos-vmtoolsd/167888192?tag=0.3.2
+        - image: ghcr.io/siderolabs/talos-vmtoolsd:0.3.2@sha256:d8c61fbfbec0c6163e4b9970f918a1c9b43bf861de466f4abaefa8c18ffd8510
           name: talos-vmtoolsd
           volumeMounts:
             - name: config
