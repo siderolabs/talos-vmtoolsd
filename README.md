@@ -28,15 +28,15 @@ rm vmtoolsd-secret.yaml
 Install or upgrade `talos-vmtoolsd`:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/mologie/talos-vmtoolsd/release-0.3/deploy/0.3.yaml
+kubectl apply -f https://raw.githubusercontent.com/siderolabs/talos-vmtoolsd/release-0.3/deploy/0.3.yaml
 ```
 
 # Talos Compatibility Matrix
 
 | ⬇️ Tools \ Talos ➡️ | 0.7 - 0.10 | 0.11 - 0.13 | 0.14 - 1.4 | 1.4 | 1.5+ |
 | ----------------- | ---------- | ----------- | ---------- | --- | ---- |
-| **0.4** (current) |  ❌         | ❌           | ❌        | ✅   | ✅    |
-| **0.3**           |  ❌         | ✅           | ✅        | ✅   | ❌    |
+| **0.4** (master)  |  ❌         | ❌           | ❌        | ✅   | ✅    |
+| **0.3** (current) |  ❌         | ✅           | ✅        | ✅   | ❌    |
 | **0.2**           |  ✅         | ✅           | ❌        | ❌   | ❌    |
 
 # Roadmap
