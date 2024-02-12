@@ -29,7 +29,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       containers:
-        - image: ghcr.io/siderolabs/talos-vmtoolsd-unstable:latest
+        - image: ghcr.io/siderolabs/talos-vmtoolsd:latest
           imagePullPolicy: Always
           name: talos-vmtoolsd
           volumeMounts:
