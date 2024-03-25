@@ -9,6 +9,7 @@ RUN go test -v ./... && \
     go vet ./... && \
     go build -ldflags="-s -w" -trimpath -o talos-vmtoolsd ./cmd/talos-vmtoolsd
 
-FROM gcr.io/distroless/static-debian10
+FROM scratch
+WORKDIR /bin
 COPY --from=builder /build/talos-vmtoolsd /bin/talos-vmtoolsd
 ENTRYPOINT ["/bin/talos-vmtoolsd"]
