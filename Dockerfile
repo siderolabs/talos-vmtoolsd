@@ -1,4 +1,4 @@
-FROM golang:1.21.0-alpine AS builder
+FROM golang:1.22.1-alpine AS builder
 WORKDIR /build
 COPY . .
 ARG TARGETARCH
@@ -9,6 +9,7 @@ RUN go test -v ./... && \
     go vet ./... && \
     go build -ldflags="-s -w" -trimpath -o talos-vmtoolsd ./cmd/talos-vmtoolsd
 
-FROM gcr.io/distroless/static-debian10
+FROM scratch
+WORKDIR /bin
 COPY --from=builder /build/talos-vmtoolsd /bin/talos-vmtoolsd
 ENTRYPOINT ["/bin/talos-vmtoolsd"]
