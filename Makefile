@@ -15,9 +15,6 @@ talos-vmtoolsd:
 	go build -ldflags="-s -w" -trimpath -o $@ ./cmd/$@
 
 docker-build:
-	docker buildx build . --tag $(REGISTRY_AND_USERNAME)/${IMAGE_NAME}:$(IMAGE_TAG) --file Dockerfile
+	docker buildx build . --tag $(REGISTRY_AND_USERNAME)/${IMAGE_NAME}:$(IMAGE_TAG)
 
-docker-build-extension:
-	docker buildx build . --tag $(REGISTRY_AND_USERNAME)/${IMAGE_NAME}-system-extension:$(IMAGE_TAG) --file system-extension/Dockerfile
-
-.PHONY: talos-vmtoolsd docker-build docker-build-extension
+.PHONY: talos-vmtoolsd docker-build
