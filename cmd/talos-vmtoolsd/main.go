@@ -50,7 +50,7 @@ func main() {
 	l.Infof("talos-vmtoolsd version %v\n"+
 		"Copyright 2020-2022 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
 		"This program is free software and available under the Apache 2.0 license.",
-		version.Version)
+		version.Tag)
 
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling

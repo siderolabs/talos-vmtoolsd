@@ -1,0 +1,46 @@
+---
+kind: common.Repository
+spec:
+  licenses: []
+  conformGPGSignatureCheck: false
+---
+kind: golang.Generate
+spec:
+    versionPackagePath: internal/version
+---
+kind: service.CodeCov
+spec:
+  enabled: false
+---
+kind: common.Image
+spec:
+  additionalImages: []
+  allowedLocalPaths:
+    - manifest.yaml
+    - talos-vmtoolsd.yaml
+  copyFrom:
+    - stage: extension
+  entrypoint: /rootfs/usr/local/lib/containers/talos-vmtoolsd/talos-vmtoolsd
+---
+kind: auto.CustomSteps
+spec:
+  steps:
+    - name: extension
+      toplevel: true
+---
+kind: custom.Step
+name: extension
+spec:
+  docker:
+    enabled: true
+    stages:
+      - name: extension
+        description: copies the required files for the extension
+        steps:
+          - copy:
+              src: manifest.yaml
+              dst: /
+          - copy:
+              src: talos-vmtoolsd.yaml
+              dst: /rootfs/usr/local/etc/containers/talos-vmtoolsd.yaml
+---

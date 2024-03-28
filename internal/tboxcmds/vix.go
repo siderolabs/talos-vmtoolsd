@@ -168,7 +168,7 @@ func (c *VixCommandServer) GetToolsState(_ vix.CommandRequestHeader, _ []byte) (
 		vix.NewStringProperty(vix.PropertyGuestOsVersion, osVersion),
 		vix.NewStringProperty(vix.PropertyGuestOsVersionShort, versionShort),
 		vix.NewStringProperty(vix.PropertyGuestToolsProductNam, "Talos Tools"),
-		vix.NewStringProperty(vix.PropertyGuestToolsVersion, version.Version),
+		vix.NewStringProperty(vix.PropertyGuestToolsVersion, version.Tag),
 		vix.NewStringProperty(vix.PropertyGuestName, hostname),
 		vix.NewInt32Property(vix.PropertyGuestToolsAPIOptions, VixToolsFeatureSupportGetHandleState),
 		vix.NewInt32Property(vix.PropertyGuestOsFamily, VixGuestOfFamilyLinux),

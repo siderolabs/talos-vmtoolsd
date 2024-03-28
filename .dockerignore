@@ -1,3 +1,14 @@
-.git
-.github
-deploy
+# THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
+#
+# Generated on 2024-04-01T09:05:42Z by kres latest.
+
+*
+!cmd
+!internal
+!go.mod
+!go.sum
+!.golangci.yml
+!README.md
+!.markdownlint.json
+!manifest.yaml
+!talos-vmtoolsd.yaml
