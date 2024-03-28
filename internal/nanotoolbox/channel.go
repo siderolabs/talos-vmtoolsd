@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package nanotoolbox provides a minimal set of tools for communicating with the vmx.
 package nanotoolbox
 
 import (
@@ -33,9 +34,10 @@ const (
 	tcloProtocol uint32 = 0x4f4c4354
 )
 
+// ErrNotVirtualWorld is returned when the current process is not running in a virtual world.
 var ErrNotVirtualWorld = errors.New("not in a virtual world")
 
-// Channel abstracts the guest<->vmx RPC transport
+// Channel abstracts the guest<->vmx RPC transport.
 type Channel interface {
 	Start() error
 	Stop() error
@@ -44,16 +46,18 @@ type Channel interface {
 }
 
 var (
-	RpciOK  = []byte{'1', ' '}
+	// RpciOK is the return code for a successful RPCI request.
+	RpciOK = []byte{'1', ' '}
+	// RpciERR is the return code for a failed RPCI request.
 	RpciERR = []byte{'0', ' '}
 )
 
-// ChannelOut extends Channel to provide RPCI protocol helpers
+// ChannelOut extends Channel to provide RPCI protocol helpers.
 type ChannelOut struct {
 	Channel
 }
 
-// Request sends an RPC command to the vmx and checks the return code for success or error
+// Request sends an RPC command to the vmx and checks the return code for success or error.
 func (c *ChannelOut) Request(request []byte) ([]byte, error) {
 	if c.Channel == nil {
 		return nil, fmt.Errorf("no channel available for request %q", request)
@@ -75,7 +79,7 @@ func (c *ChannelOut) Request(request []byte) ([]byte, error) {
 	return nil, fmt.Errorf("failed request %q: %q", request, reply)
 }
 
-type hypervisorChannel struct {
+type hypervisorChannel struct { //nolint:govet
 	protocol uint32
 
 	*message.Channel
@@ -108,8 +112,10 @@ func (b *hypervisorChannel) Stop() error {
 	return err
 }
 
+// NewHypervisorChannelPair returns a pair of channels for communicating with the vmx.
 func NewHypervisorChannelPair() (Channel, Channel) {
 	in := &hypervisorChannel{protocol: tcloProtocol}
 	out := &hypervisorChannel{protocol: rpciProtocol}
+
 	return in, out
 }

@@ -20,19 +20,22 @@ package tboxcmds
 
 import "net/netip"
 
-type TypedIPAddress struct {
+// TypedIPAddress represents an IP address with a type.
+type TypedIPAddress struct { //nolint:govet
 	Type    int32
 	Address []byte
 }
 
-type IPAddressEntry struct {
+// IPAddressEntry represents an IP address with prefix length, origin, and status.
+type IPAddressEntry struct { //nolint:govet
 	Address      TypedIPAddress
 	PrefixLength uint32
 	Origin       *int32 `xdr:"optional"`
 	Status       *int32 `xdr:"optional"`
 }
 
-type InetCidrRouteEntry struct {
+// InetCidrRouteEntry represents a route entry.
+type InetCidrRouteEntry struct { //nolint:govet
 	Dest         TypedIPAddress
 	PrefixLength uint32
 	NextHop      *TypedIPAddress `xdr:"optional"`
@@ -41,24 +44,28 @@ type InetCidrRouteEntry struct {
 	Metric       uint32
 }
 
-type DNSConfigInfo struct {
+// DNSConfigInfo represents DNS configuration.
+type DNSConfigInfo struct { //nolint:govet
 	HostName   *string `xdr:"optional"`
 	DomainName *string `xdr:"optional"`
 	Servers    []TypedIPAddress
 	Search     *string `xdr:"optional"`
 }
 
+// WinsConfigInfo represents WINS configuration.
 type WinsConfigInfo struct {
 	Primary   TypedIPAddress
 	Secondary TypedIPAddress
 }
 
-type DhcpConfigInfo struct {
+// DhcpConfigInfo represents DHCP configuration.
+type DhcpConfigInfo struct { //nolint:govet
 	Enabled  bool
 	Settings string
 }
 
-type GuestNicV3 struct {
+// GuestNicV3 represents NIC information.
+type GuestNicV3 struct { //nolint:govet
 	MacAddress       string
 	IPs              []IPAddressEntry
 	DNSConfigInfo    *DNSConfigInfo  `xdr:"optional"`
@@ -67,14 +74,17 @@ type GuestNicV3 struct {
 	DhcpConfigInfov6 *DhcpConfigInfo `xdr:"optional"`
 }
 
-type GuestNicInfo struct {
+// GuestNicInfo represents NIC information.
+type GuestNicInfo struct { //nolint:govet
 	Version int32
 	V3      *NicInfoV3 `xdr:"optional"`
 }
 
+// AddIP adds an IP address to the NIC.
 func (nic *GuestNicV3) AddIP(prefix netip.Prefix) {
 	addr := prefix.Addr()
 	kind := int32(1) // IAT_IPV4
+
 	if addr.Is6() {
 		kind = 2 // IAT_IPV6
 	} else if addr.Is4In6() {
@@ -96,7 +106,8 @@ func (nic *GuestNicV3) AddIP(prefix netip.Prefix) {
 	nic.IPs = append(nic.IPs, e)
 }
 
-type NicInfoV3 struct {
+// NicInfoV3 contains NIC information.
+type NicInfoV3 struct { //nolint:govet
 	Nics             []GuestNicV3
 	Routes           []InetCidrRouteEntry
 	DNSConfigInfo    *DNSConfigInfo  `xdr:"optional"`
@@ -105,6 +116,7 @@ type NicInfoV3 struct {
 	DhcpConfigInfov6 *DhcpConfigInfo `xdr:"optional"`
 }
 
+// NewGuestNicInfo creates a new GuestNicInfo.
 func NewGuestNicInfo() *GuestNicInfo {
 	return &GuestNicInfo{
 		Version: 3,

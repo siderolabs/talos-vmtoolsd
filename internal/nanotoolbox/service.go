@@ -29,10 +29,10 @@ import (
 )
 
 const (
-	// TOOLS_VERSION_UNMANAGED as defined in open-vm-tools/lib/include/vm_tools_version.h
+	// TOOLS_VERSION_UNMANAGED as defined in open-vm-tools/lib/include/vm_tools_version.h.
 	toolsVersionUnmanaged = 0x7fffffff
 
-	// RPCIN_MAX_DELAY as defined in rpcChannelInt.h
+	// RPCIN_MAX_DELAY as defined in rpcChannelInt.h.
 	maxDelay = 100 * time.Millisecond
 
 	// If we have an RPCI send error, the channels will be reset.
@@ -40,8 +40,8 @@ const (
 	resetDelay = 5 * time.Second
 )
 
-// Service receives and dispatches incoming RPC requests from the vmx
-type Service struct {
+// Service receives and dispatches incoming RPC requests from the vmx.
+type Service struct { //nolint:govet
 	Log logrus.FieldLogger
 	Out *ChannelOut
 
@@ -58,7 +58,7 @@ type Service struct {
 	capabilities    []string
 }
 
-// NewService initializes a Service instance
+// NewService initializes a Service instance.
 func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service {
 	s := &Service{
 		Log: log.WithField("module", "nanotoolbox"),
@@ -84,7 +84,7 @@ func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service 
 	return s
 }
 
-// backoff exponentially increases the RPC poll delay up to maxDelay
+// backoff exponentially increases the RPC poll delay up to maxDelay.
 func (s *Service) backoff() {
 	if s.delay < maxDelay {
 		if s.delay > 0 {
@@ -101,8 +101,8 @@ func (s *Service) backoff() {
 }
 
 func (s *Service) stopChannel() {
-	_ = s.in.Stop()
-	_ = s.Out.Stop()
+	s.in.Stop()  //nolint:errcheck
+	s.Out.Stop() //nolint:errcheck
 }
 
 func (s *Service) startChannel() error {
@@ -117,18 +117,21 @@ func (s *Service) startChannel() error {
 func (s *Service) checkReset() error {
 	if s.rpcError {
 		s.stopChannel()
+
 		err := s.startChannel()
 		if err != nil {
 			s.delay = resetDelay
+
 			return err
 		}
+
 		s.rpcError = false
 	}
 
 	return nil
 }
 
-// Start initializes the RPC channels and starts a goroutine to listen for incoming RPC requests
+// Start initializes the RPC channels and starts a goroutine to listen for incoming RPC requests.
 func (s *Service) Start() error {
 	err := s.startChannel()
 	if err != nil {
@@ -136,6 +139,7 @@ func (s *Service) Start() error {
 	}
 
 	s.wg.Add(1)
+
 	go func() {
 		defer s.wg.Done()
 
@@ -150,6 +154,7 @@ func (s *Service) Start() error {
 			select {
 			case <-s.stop:
 				s.stopChannel()
+
 				return
 			case <-time.After(s.delay):
 				if err = s.checkReset(); err != nil {
@@ -158,13 +163,15 @@ func (s *Service) Start() error {
 
 				err = s.in.Send(response)
 				response = nil
+
 				if err != nil {
 					s.delay = resetDelay
 					s.rpcError = true
+
 					continue
 				}
 
-				request, _ := s.in.Receive()
+				request, _ := s.in.Receive() //nolint:errcheck
 
 				if len(request) > 0 {
 					response = s.Dispatch(request)
@@ -179,7 +186,7 @@ func (s *Service) Start() error {
 	return nil
 }
 
-// Stop cancels the RPC listener routine created via Start
+// Stop cancels the RPC listener routine created via Start.
 func (s *Service) Stop() {
 	close(s.stop)
 }
@@ -189,29 +196,33 @@ func (s *Service) Wait() {
 	s.wg.Wait()
 }
 
-// CommandHandler is given the raw argument portion of an RPC request and returns a response
+// CommandHandler is given the raw argument portion of an RPC request and returns a response.
 type CommandHandler func([]byte) ([]byte, error)
 
-// OptionHandler is given the raw key and value of Set_Option requests
+// OptionHandler is given the raw key and value of Set_Option requests.
 type OptionHandler func(key, value string)
 
+// AddCapability adds a capability to the Service.
 func (s *Service) AddCapability(name string) {
 	s.capabilities = append(s.capabilities, name)
 }
 
+// RegisterCommandHandler adds a CommandHandler to the Service.
 func (s *Service) RegisterCommandHandler(name string, handler CommandHandler) {
 	s.commandHandlers[name] = handler
 }
 
+// RegisterOptionHandler adds an OptionHandler to the Service.
 func (s *Service) RegisterOptionHandler(key string, handler OptionHandler) {
 	s.optionHandlers[key] = handler
 }
 
+// RegisterResetHandler adds a function to be called when the Service is reset.
 func (s *Service) RegisterResetHandler(f func()) {
 	s.resetHandlers = append(s.resetHandlers, f)
 }
 
-// Dispatch an incoming RPC request to a CommandHandler
+// Dispatch an incoming RPC request to a CommandHandler.
 func (s *Service) Dispatch(request []byte) []byte {
 	msg := bytes.SplitN(request, []byte{' '}, 2)
 	name := msg[0]
@@ -226,6 +237,7 @@ func (s *Service) Dispatch(request []byte) []byte {
 
 	if !ok {
 		l.Debug("unknown command")
+
 		return []byte("ERROR Unknown Command")
 	}
 
@@ -239,39 +251,48 @@ func (s *Service) Dispatch(request []byte) []byte {
 		response = append([]byte("OK "), response...)
 	} else {
 		l.WithError(err).Warn("error calling handler")
+
 		response = append([]byte("ERROR "), response...)
 	}
 
 	return response
 }
 
+// HandleReset resets the Service.
 func (s *Service) HandleReset([]byte) ([]byte, error) {
 	for _, f := range s.resetHandlers {
 		f()
 	}
+
 	return []byte("ATR " + s.name), nil
 }
 
+// HandlePing responds to a ping request.
 func (s *Service) HandlePing([]byte) ([]byte, error) {
 	return nil, nil
 }
 
+// HandleSetOption handles Set_Option requests.
 func (s *Service) HandleSetOption(args []byte) ([]byte, error) {
 	opts := bytes.SplitN(args, []byte{' '}, 2)
 	key := string(opts[0])
 	val := string(opts[1])
+
 	if handler, ok := s.optionHandlers[key]; ok {
 		handler(key, val)
 	}
+
 	return nil, nil
 }
 
+// HandleCapabilitiesRegister sends the Service's capabilities to the vmx.
 func (s *Service) HandleCapabilitiesRegister([]byte) ([]byte, error) {
 	for _, capability := range s.capabilities {
 		_, err := s.Out.Request([]byte(capability))
 		if err != nil {
-			return nil, fmt.Errorf("error sending %q: %s", capability, err)
+			return nil, fmt.Errorf("error sending %q: %w", capability, err)
 		}
 	}
+
 	return nil, nil
 }
