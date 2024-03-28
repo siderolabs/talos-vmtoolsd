@@ -6,11 +6,33 @@
 
 Deploying this program on your Talos cluster provides native integration of Talos with vSphere/vCenter.
 
-# Installation
+# Installation as a Talos System Extension
 
-A standard K8s DaemonSet is used for deployment.
+The preferred use is as a [System Extension](https://www.talos.dev/latest/talos-guides/configuration/system-extensions/).
+Please refer to the Talos documentation on how to build [Boot Assets](https://www.talos.dev/latest/talos-guides/install/boot-assets/#imager)
+that include `talos-vmtoolsd`.
 
-Start by providing authorization credentials to enable talos-vmtoolsd to talk with apid. Admin credentials are required in order to issue reboot/shutdown commands.
+Basically, for a node upgrade, it boils down to something like this:
+
+```
+# Generate installer image including `talos-vmtoolsd`
+docker run --rm --tty \
+    --volume $PWD/_out:/out ghcr.io/siderolabs/imager:<talos version> \
+    installer \
+    --system-extension-image ghcr.io/siderolabs/talos-vmtoolsd:<talos vmtoolsd version>
+
+# Push the installer image as a container to your registry
+crane push _out/installer-amd64.tar ghcr.io/<username></username>/talos-installer:<talos version>
+
+# Upgrade node
+talosctl upgrade --nodes <node ip> \
+    --image ghcr.io/<username></username>/talos-installer:<talos version>
+```
+
+# Installation as a DaemonSet
+
+Start by providing authorization credentials to enable talos-vmtoolsd to talk with apid.
+Admin credentials are required in order to issue reboot/shutdown commands.
 
 ```
 # create new Talos API credentials
