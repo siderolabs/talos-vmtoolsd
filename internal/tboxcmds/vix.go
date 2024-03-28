@@ -17,6 +17,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// Package tboxcmds provides a set of commands for the vmx.
 package tboxcmds
 
 import (
@@ -24,25 +25,32 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	tvmtoolsd "github.com/siderolabs/talos-vmtoolsd"
-	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
+
 	"github.com/sirupsen/logrus"
 	"github.com/vmware/govmomi/toolbox/vix"
+
+	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
+	"github.com/siderolabs/talos-vmtoolsd/internal/version"
 )
 
 const (
+	// VixToolsFeatureSupportGetHandleState defines the VixToolsFeatureSupportGetHandleState feature.
 	VixToolsFeatureSupportGetHandleState = 1
-	VixGuestOfFamilyLinux                = 1
+	// VixGuestOfFamilyLinux defines the VixGuestOfFamilyLinux family.
+	VixGuestOfFamilyLinux = 1
 )
 
+// VixCommandHandler is a function that handles a Vix command.
 type VixCommandHandler func(vix.CommandRequestHeader, []byte) ([]byte, error)
 
+// VixDelegate is the interface that must be implemented by the delegate.
 type VixDelegate interface {
 	OSVersion() string
 	OSVersionShort() string
 	Hostname() string
 }
 
+// VixCommandServer provides a set of commands for the vmx.
 type VixCommandServer struct {
 	log      logrus.FieldLogger
 	out      *nanotoolbox.ChannelOut
@@ -50,6 +58,7 @@ type VixCommandServer struct {
 	handlers map[uint32]VixCommandHandler
 }
 
+// RegisterVixCommand registers the Vix command.
 func RegisterVixCommand(svc *nanotoolbox.Service, delegate VixDelegate) {
 	svr := &VixCommandServer{
 		log:      svc.Log.WithField("command", "vix"),
@@ -86,42 +95,53 @@ func commandResult(header vix.CommandRequestHeader, rc int, err error, response 
 	return buf.Bytes()
 }
 
+// Dispatch dispatches the Vix command.
 func (c *VixCommandServer) Dispatch(data []byte) ([]byte, error) {
 	// See ToolsDaemonTcloGetQuotedString
 	if data[0] == '"' {
 		data = data[1:]
 	}
+
 	name := ""
+
 	ix := bytes.IndexByte(data, '"')
 	if ix > 0 {
 		name = string(data[:ix])
 		data = data[ix+1:]
 	}
+
 	if data[0] == 0 {
 		data = data[1:]
 	}
+
 	l := c.log.WithField("command_name", name)
 
 	var header vix.CommandRequestHeader
+
 	buf := bytes.NewBuffer(data)
+
 	err := binary.Read(buf, binary.LittleEndian, &header)
 	if err != nil {
 		l.WithError(err).Print("decoding command failed")
+
 		return nil, err
 	}
 
 	if header.Magic != vix.CommandMagicWord {
 		l.Print("invalid magic header for command")
+
 		return commandResult(header, vix.InvalidMessageHeader, nil, nil), nil
 	}
 
 	handler, ok := c.handlers[header.OpCode]
 	if !ok {
 		l.Warn("unhandled command")
+
 		return commandResult(header, vix.UnrecognizedCommandInGuest, nil, nil), nil
 	}
 
 	rc := vix.OK
+
 	response, err := handler(header, buf.Bytes())
 	if err != nil {
 		l.WithError(err).Error("command handler failed")
@@ -131,28 +151,32 @@ func (c *VixCommandServer) Dispatch(data []byte) ([]byte, error) {
 	return commandResult(header, rc, err, response), nil
 }
 
+// RegisterHandler registers the Vix command handler.
 func (c *VixCommandServer) RegisterHandler(op uint32, handler VixCommandHandler) {
 	c.handlers[op] = handler
 }
 
+// GetToolsState returns the tools state.
 func (c *VixCommandServer) GetToolsState(_ vix.CommandRequestHeader, _ []byte) ([]byte, error) {
-	version := c.delegate.OSVersion()
+	osVersion := c.delegate.OSVersion()
 	versionShort := c.delegate.OSVersionShort()
 	hostname := c.delegate.Hostname()
 	c.log.Debugf("sending tools state version=%q versionShort=%q hostname=%q",
-		version, versionShort, hostname)
+		osVersion, versionShort, hostname)
+
 	props := vix.PropertyList{
-		vix.NewStringProperty(vix.PropertyGuestOsVersion, version),
+		vix.NewStringProperty(vix.PropertyGuestOsVersion, osVersion),
 		vix.NewStringProperty(vix.PropertyGuestOsVersionShort, versionShort),
 		vix.NewStringProperty(vix.PropertyGuestToolsProductNam, "Talos Tools"),
-		vix.NewStringProperty(vix.PropertyGuestToolsVersion, tvmtoolsd.Version),
+		vix.NewStringProperty(vix.PropertyGuestToolsVersion, version.Version),
 		vix.NewStringProperty(vix.PropertyGuestName, hostname),
 		vix.NewInt32Property(vix.PropertyGuestToolsAPIOptions, VixToolsFeatureSupportGetHandleState),
 		vix.NewInt32Property(vix.PropertyGuestOsFamily, VixGuestOfFamilyLinux),
 	}
-	src, _ := props.MarshalBinary()
+	src, _ := props.MarshalBinary() //nolint:errcheck
 	enc := base64.StdEncoding
 	buf := make([]byte, enc.EncodedLen(len(src)))
 	enc.Encode(buf, src)
+
 	return buf, nil
 }

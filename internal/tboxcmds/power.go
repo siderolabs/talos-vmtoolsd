@@ -2,11 +2,13 @@ package tboxcmds
 
 import (
 	"fmt"
-	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
+
 	"github.com/sirupsen/logrus"
+
+	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
 )
 
-// vmware/guestrpc/powerops.h
+// vmware/guestrpc/powerops.h.
 const (
 	_ = iota
 	PowerStateHalt
@@ -24,14 +26,16 @@ var powerCmdName = map[int]string{
 	PowerStateSuspend: "OS_Suspend",
 }
 
+// PowerDelegate is the interface that must be implemented by the delegate.
 type PowerDelegate interface {
 	Shutdown() error
 	Reboot() error
 }
 
+// PowerHandler is the type of the function that handles power operations.
 type PowerHandler func() error
 
-type powerOp struct {
+type powerOp struct { //nolint:govet
 	log     logrus.FieldLogger
 	out     *nanotoolbox.ChannelOut
 	state   int
@@ -47,9 +51,11 @@ func (op powerOp) HandleCommand([]byte) ([]byte, error) {
 	l.Debug("handling power operation")
 
 	rc := nanotoolbox.RpciOK
+
 	if op.handler != nil {
 		if err := op.handler(); err != nil {
 			l.WithError(err).Error("error handling power operation")
+
 			rc = nanotoolbox.RpciERR
 		}
 	}
@@ -69,9 +75,11 @@ func powerOpHandler(svc *nanotoolbox.Service, state int, handler PowerHandler) (
 		state:   state,
 		handler: handler,
 	}
+
 	return op.Name(), op.HandleCommand
 }
 
+// RegisterPowerDelegate registers the power operations with the service.
 func RegisterPowerDelegate(svc *nanotoolbox.Service, delegate PowerDelegate) {
 	svc.AddCapability("tools.capability.statechange")
 	svc.RegisterCommandHandler(powerOpHandler(svc, PowerStateHalt, delegate.Shutdown))
