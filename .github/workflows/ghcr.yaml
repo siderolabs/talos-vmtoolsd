@@ -36,7 +36,7 @@ jobs:
             docker push $IMGPATH:latest
           else
             IMGPATH=ghcr.io/${{ github.repository }}-unstable
-            [ "$VERSION" == "master" ] && VERSION=latest
+            [ "$VERSION" == "main" ] && VERSION=latest
             docker build . -t $IMGPATH:$VERSION
             docker push $IMGPATH:$VERSION
           fi
