@@ -35,22 +35,22 @@ Start by providing authorization credentials to enable talos-vmtoolsd to talk wi
 Admin credentials are required in order to issue reboot/shutdown commands.
 
 ```
-# create new Talos API credentials
-# (insert a control plane node's IP at $IP)
-talosctl -n $IP config new vmtoolsd-secret.yaml --roles os:admin
+# Create new Talos API credentials
+talosctl --nodes <node ip> config new vmtoolsd-secret.yaml --roles os:admin
 
-# import API credentials into K8s
-kubectl -n kube-system create secret generic talos-vmtoolsd-config \
-  --from-file=talosconfig=./vmtoolsd-secret.yaml
+# Import API credentials into K8s
+kubectl --namespace kube-system \
+    create secret generic talos-vmtoolsd-config \
+    --from-file=talosconfig=./vmtoolsd-secret.yaml
 
-# delete temporary credentials file
+# Delete temporary credentials file
 rm vmtoolsd-secret.yaml
 ```
 
 Install or upgrade `talos-vmtoolsd`:
 
 ```
-kubectl apply -f https://raw.githubusercontent.com/siderolabs/talos-vmtoolsd/master/deploy/latest.yaml
+kubectl apply --filename https://raw.githubusercontent.com/siderolabs/talos-vmtoolsd/master/deploy/latest.yaml
 ```
 
 # Talos Compatibility Matrix
