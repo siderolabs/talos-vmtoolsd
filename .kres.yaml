@@ -1,0 +1,13 @@
+---
+kind: common.Repository
+spec:
+  licenses: []
+  conformGPGSignatureCheck: false
+---
+kind: golang.Generate
+spec:
+    versionPackagePath: internal/version
+---
+kind: service.CodeCov
+spec:
+  enabled: false

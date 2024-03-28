@@ -1,3 +1,12 @@
-.git
-.github
-deploy
+# THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
+#
+# Generated on 2024-03-28T12:14:24Z by kres 88d1199.
+
+*
+!cmd
+!internal
+!go.mod
+!go.sum
+!.golangci.yml
+!README.md
+!.markdownlint.json
