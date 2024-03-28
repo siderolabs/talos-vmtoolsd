@@ -7,4 +7,4 @@ metadata:
     This system extension provides talos-vmtoolsd
   compatibility:
     talos:
-      version: ">= v1.2.0"
+      version: ">= v1.4.0"
