@@ -82,6 +82,7 @@ func powerOpHandler(svc *nanotoolbox.Service, state int, handler PowerHandler) (
 // RegisterPowerDelegate registers the power operations with the service.
 func RegisterPowerDelegate(svc *nanotoolbox.Service, delegate PowerDelegate) {
 	svc.AddCapability("tools.capability.statechange")
+	svc.AddCapability("tools.capability.softpowerop_retry")
 	svc.RegisterCommandHandler(powerOpHandler(svc, PowerStateHalt, delegate.Shutdown))
 	svc.RegisterCommandHandler(powerOpHandler(svc, PowerStateReboot, delegate.Reboot))
 	svc.RegisterCommandHandler(powerOpHandler(svc, PowerStatePowerOn, nil))

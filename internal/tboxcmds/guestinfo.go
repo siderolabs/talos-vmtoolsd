@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"fmt"
 	"net/netip"
+	"os"
+	"strconv"
 
 	"github.com/sirupsen/logrus"
 	xdr "github.com/stellar/go-xdr/xdr3"
@@ -22,7 +24,8 @@ const (
 	GuestInfoOSNameFull
 	// GuestInfoOSName is the guest info kind for the OS name.
 	GuestInfoOSName
-	_ // uptime
+	// GuestInfoUptime is the guest uptime in 100s of seconds.
+	GuestInfoUptime
 	_ // memory
 	_ // IP v2
 	// GuestInfoIPAddressV3 is the guest info kind for the IP address.
@@ -156,6 +159,34 @@ func (cmd *GuestInfoCommands) SendGuestInfoOSName() {
 	}
 }
 
+// GuestUptime represents the system uptime.
+func (cmd *GuestInfoCommands) GuestUptime() int64 {
+	u, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		cmd.log.WithError(err).Error("error getting uptime")
+
+		return -1
+	}
+
+	field := bytes.Fields(u)[0]
+
+	uptime, err := strconv.ParseFloat(string(field), 64)
+	if err != nil {
+		cmd.log.WithError(err).Error("error getting uptime")
+
+		return -1
+	}
+
+	return int64(uptime * 100)
+}
+
+// SendGuestInfoUptime sends the guest uptime.
+func (cmd *GuestInfoCommands) SendGuestInfoUptime() {
+	uptime := cmd.GuestUptime()
+	cmd.log.Debugf("sending uptime: %v", uptime)
+	cmd.SendGuestInfoString(GuestInfoUptime, fmt.Sprintf("%d", uptime))
+}
+
 // SendGuestInfoNIC sends the guest info NIC.
 func (cmd *GuestInfoCommands) SendGuestInfoNIC() {
 	cmd.SendGuestInfoXDR(GuestInfoIPAddressV3, cmd.GuestNicInfo())
@@ -176,6 +207,7 @@ func (cmd *GuestInfoCommands) PushGuestInfo() {
 	cmd.SendGuestInfoDNSName()
 	cmd.SendGuestInfoOSNameFull()
 	cmd.SendGuestInfoOSName()
+	cmd.SendGuestInfoUptime()
 	cmd.SendGuestInfoNIC()
 }
 
@@ -188,4 +220,8 @@ func RegisterGuestInfoCommands(svc *nanotoolbox.Service, delegate NicDelegate) {
 	}
 	svc.RegisterResetHandler(cmd.PushGuestInfo)
 	svc.RegisterOptionHandler("broadcastIP", cmd.BroadcastIPOptionHandler)
+
+	// As stated in guestInfoServer.c, VMX expects uptime information in response
+	// to the capabilities request.
+	svc.AddCapability(fmt.Sprintf("SetGuestInfo  %d %d", GuestInfoUptime, cmd.GuestUptime()))
 }
