@@ -143,21 +143,21 @@ func testQuery(api *talosapi.LocalClient, query string) error {
 	case "net-interfaces":
 		for idx, intf := range api.NetInterfaces() {
 			for _, addr := range intf.Addrs {
-				_, _ = fmt.Fprintf(w, "%d: name=%s mac=%s addr=%s\n", idx, intf.Name, intf.MAC, addr)
+				_, _ = fmt.Fprintf(w, "%d: name=%s mac=%s addr=%s\n", idx, intf.Name, intf.MAC, addr) //nolint:errcheck
 			}
 		}
 
 		return nil
 	case "hostname":
-		_, _ = fmt.Fprintln(w, api.Hostname())
+		_, _ = fmt.Fprintln(w, api.Hostname()) //nolint:errcheck
 
 		return nil
 	case "os-version":
-		_, _ = fmt.Fprintln(w, api.OSVersion())
+		_, _ = fmt.Fprintln(w, api.OSVersion()) //nolint:errcheck
 
 		return nil
 	case "os-version-short":
-		_, _ = fmt.Fprintln(w, api.OSVersionShort())
+		_, _ = fmt.Fprintln(w, api.OSVersionShort()) //nolint:errcheck
 
 		return nil
 	default:
