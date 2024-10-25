@@ -211,6 +211,16 @@ func (cmd *GuestInfoCommands) PushGuestInfo() {
 	cmd.SendGuestInfoNIC()
 }
 
+// PingHandler pushes updated guest info on ping request.
+func (cmd *GuestInfoCommands) PingHandler([]byte) ([]byte, error) {
+	cmd.SendGuestInfoDNSName()
+	cmd.SendGuestInfoOSNameFull()
+	cmd.SendGuestInfoOSName()
+	cmd.SendGuestInfoUptime()
+
+	return nil, nil
+}
+
 // RegisterGuestInfoCommands registers the guest info commands.
 func RegisterGuestInfoCommands(svc *nanotoolbox.Service, delegate NicDelegate) {
 	cmd := &GuestInfoCommands{
@@ -220,6 +230,7 @@ func RegisterGuestInfoCommands(svc *nanotoolbox.Service, delegate NicDelegate) {
 	}
 	svc.RegisterResetHandler(cmd.PushGuestInfo)
 	svc.RegisterOptionHandler("broadcastIP", cmd.BroadcastIPOptionHandler)
+	svc.RegisterCommandHandler("ping", cmd.PingHandler)
 
 	// As stated in guestInfoServer.c, VMX expects uptime information in response
 	// to the capabilities request.
