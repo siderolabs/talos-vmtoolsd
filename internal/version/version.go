@@ -1,10 +1,5 @@
-// This Source Code Form is subject to the terms of the Mozilla Public
-// License, v. 2.0. If a copy of the MPL was not distributed with this
-// file, You can obtain one at http://mozilla.org/MPL/2.0/.
-
-// THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
-//
-// Generated on 2024-03-28T13:15:25Z by kres latest.
+// SPDX-FileCopyrightText: Copyright (c) 2020 Oliver Kuckertz, Siderolabs and Equinix
+// SPDX-License-Identifier: Apache-2.0
 
 // Package version contains variables such as project name, tag and sha. It's a proper alternative to using
 // -ldflags '-X ...'.
@@ -31,8 +26,14 @@ var (
 		}
 
 		// Check if siderolabs project
-		if strings.HasPrefix(info.Path, "github.com/siderolabs/") {
-			return info.Path[strings.LastIndex(info.Path, "/")+1:]
+		prefix := "github.com/siderolabs/"
+		if strings.HasPrefix(info.Path, prefix) {
+			tail := info.Path[len(prefix):]
+
+			before, _, found := strings.Cut(tail, "/")
+			if found {
+				return before
+			}
 		}
 
 		// We could return a proper full path here, but it could be seen as a privacy violation.

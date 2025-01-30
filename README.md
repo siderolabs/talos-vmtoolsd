@@ -48,20 +48,40 @@ kubectl --namespace kube-system \
 rm vmtoolsd-secret.yaml
 ```
 
+If you craft your own manifests, please remember the note about `GRPC_ENFORCE_ALPN_ENABLED=false` below.
+
 Install or upgrade `talos-vmtoolsd`:
 
 ```bash
 kubectl apply --filename https://raw.githubusercontent.com/siderolabs/talos-vmtoolsd/master/deploy/latest.yaml
 ```
 
+Remember
+
 ## Talos Compatibility Matrix
 
-| ⬇️ Tools \ Talos ➡️ | 0.7 - 0.10 | 0.11 - 0.13 | 0.14 - 1.4 | 1.4 | 1.5 | 1.6+ |
-| ----------------- | ---------- | ----------- | ---------- | --- | --- | ---- |
-| **0.5** (current) | ❌          | ❌           | ❌          | ✅   | ✅   | ✅    |
-| **0.4**           | ❌          | ❌           | ❌          | ✅   | ✅   | ✅    |
-| **0.3**           | ❌          | ✅           | ✅          | ✅   | ❌   | ❌    |
-| **0.2**           | ✅          | ✅           | ❌          | ❌   | ❌   | ❌    |
+Please find an [older version of this matrix](https://github.com/siderolabs/talos-vmtoolsd/blob/0.4.0/README.md)
+for compatibility with older Talos and vmtoolsd-verions.
+
+| ⬇️ Tools \ Talos ➡️ |  1.5 | 1.6 | 1.7 | 1.8 | 1.9 |
+| ------------------ | --- | ----| --- | ---- | --- |
+| **1.0** (current)  |  ⚠️   |  ⚠️  |  ⚠️  |  ⚠️  | ✅  |
+| **0.6**            |  ✅  | ✅  | ✅  | ✅  | ⚠️  |
+| **0.5**            |  ✅  | ✅  |     |     |    |
+
+Talos 1.8+ carries gRPC >= 1.67, which [has issues with older gRPC](https://github.com/siderolabs/talos/issues/9463),
+and causes gRPC errors like these:
+
+```text
+rpc error: code = Unavailable desc = connection error: desc = \"transport: authentication handshake failed: credentials: cannot check peer: missing selected ALPN property\"
+```
+
+There are two workarounds:
+
+1. use older (< 0.7) `talos-vmtoolsd` on older (< 1.9) Talos versions
+2. set `GRPC_ENFORCE_ALPN_ENABLED=false` and everything will be fine
+
+The latter option is used in the system extention and example manifests.
 
 ## Roadmap
 
@@ -93,6 +113,7 @@ It simply translates between both interfaces and thereby seamlessly integrates t
 
 ## Attribution
 
+This tool was originally written by Oliver Kuckertz, and was adopted by Equinix and Siderolabs.
 Talos-vmtoolsd is based on VMware's custom VIC toolbox of the govmomi project.
 I have reduced the toolbox's functionality to the bare minimum required by vSphere.
 Its main service has been refactored for plugin support.

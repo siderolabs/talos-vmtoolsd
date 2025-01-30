@@ -1,166 +1,145 @@
-// Package main implements the main entry point for the Talos VMware Tools Daemon.
+// SPDX-FileCopyrightText: Copyright (c) 2020 Oliver Kuckertz, Siderolabs and Equinix
+// SPDX-License-Identifier: Apache-2.0
+
+// Package main is the main package invoking the tool
 package main
 
 import (
 	"context"
-	"flag"
+	"errors"
 	"fmt"
+	"log/slog"
 	"os"
-	"os/signal"
-	"syscall"
+	"strings"
 
-	"github.com/sirupsen/logrus"
-	vmguestmsg "github.com/vmware/vmw-guestinfo/message"
-	"github.com/vmware/vmw-guestinfo/vmcheck"
+	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
-	"github.com/siderolabs/talos-vmtoolsd/internal/nanotoolbox"
-	"github.com/siderolabs/talos-vmtoolsd/internal/talosapi"
-	"github.com/siderolabs/talos-vmtoolsd/internal/tboxcmds"
+	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
+	"github.com/siderolabs/talos-vmtoolsd/internal/util"
 	"github.com/siderolabs/talos-vmtoolsd/internal/version"
 )
 
-// Debug flags.
-var (
-	talosTestQuery    string
-	useMachinedSocket bool
+const (
+	flagUseMachined = "use-machined"
+	flagLogLevel    = "log-level"
+	flagTalosConfig = "talos-config"
+	flagTalosNode   = "talos-node"
 )
 
-func main() {
-	l := logrus.StandardLogger()
-	l.SetFormatter(&logrus.JSONFormatter{
-		DisableTimestamp:  true,
-		DisableHTMLEscape: true,
-	})
+var rootCmd = &cobra.Command{
+	Use:                "talos-vmtoolsd",
+	Short:              "toolset that glues talos to vmware hypervisors",
+	Long:               "this is a tool like open-vm-tools, but for Talos Linux",
+	PersistentPreRunE:  setup,
+	PersistentPostRunE: cleanup,
+}
 
-	flag.StringVar(&talosTestQuery, "test-apid-query", "", "query apid")
-	flag.BoolVar(&useMachinedSocket, "use-machined", false, "use machined unix socket")
-	flag.Parse()
+var errTalosSetupFailed = errors.New("error setting up Talos connection")
 
-	// Apply log level, default to "info"
-	if levelStr, ok := os.LookupEnv("LOG_LEVEL"); ok {
-		if level, err := logrus.ParseLevel(levelStr); err != nil {
-			l.WithError(err).Fatal("error parsing log level")
-		} else {
-			l.SetLevel(level)
-		}
-	} else {
-		l.SetLevel(logrus.InfoLevel)
+var (
+	logger    *slog.Logger
+	api       *talosconnection.TalosAPIConnection
+	ctx       context.Context
+	ctxCancel context.CancelFunc
+)
+
+func parseLevel(s string) (slog.Level, error) {
+	// slog does not support trace level logging by default, but is flexible
+	if strings.ToUpper(s) == "TRACE" {
+		return util.LogLevelTrace, nil
 	}
 
-	l.Infof("talos-vmtoolsd version %v\n"+
-		"Copyright 2020-2022 Oliver Kuckertz <oliver.kuckertz@mologie.de>\n"+
-		"This program is free software and available under the Apache 2.0 license.",
-		version.Tag)
+	var level slog.Level
+	err := level.UnmarshalText([]byte(s))
 
-	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
-	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
-	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
-	if !vmcheck.IsVirtualCPU() {
-		// NB: We cannot simply exit(0) because DaemonSets are always restarted.
-		l.Info("halting because the current node is not running under ESXi. fair winds!")
-		select {}
+	return level, err
+}
+
+func setup(cmd *cobra.Command, _ []string) error {
+	level, err := parseLevel(viper.GetString(flagLogLevel))
+	if err != nil {
+		panic("error parsing log level")
 	}
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	logOpts := &slog.HandlerOptions{
+		Level: level,
+	}
 
-	var (
-		api *talosapi.LocalClient
-		err error
-	)
+	logger = slog.New(slog.NewTextHandler(os.Stdout, logOpts)).With("command", cmd.Name())
+	ctx, ctxCancel = context.WithCancel(context.Background())
 
-	if !useMachinedSocket {
+	if !viper.GetBool(flagUseMachined) {
 		// Our spec file passes the secret path and K8s host IP via env vars.
-		configPath := os.Getenv("TALOS_CONFIG_PATH")
+		configPath := viper.GetString(flagTalosConfig)
 		if len(configPath) == 0 {
-			l.Fatal("error: TALOS_CONFIG_PATH is a required path to a Talos configuration file")
+			logger.Error("a path to a Talos configuration file is required when not connecting to machined")
+
+			return errTalosSetupFailed
 		}
 
-		k8sHost := os.Getenv("TALOS_HOST")
-		if len(k8sHost) == 0 {
-			l.Fatal("error: TALOS_HOST is required to point to a node's internal IP")
+		talosNode := viper.GetString(flagTalosNode)
+		if len(talosNode) == 0 {
+			logger.Error("you need to specify a Talos node when not connecting to machined")
+
+			return errTalosSetupFailed
 		}
 
 		// Connect to Talos apid
-		api, err = talosapi.NewLocalClient(ctx, l, configPath, k8sHost)
+		var err error
+
+		api, err = talosconnection.RemoteApidConnection(ctx, logger.With("module", "talosconnection"), configPath, talosNode)
 		if err != nil {
-			l.WithError(err).Fatal("could not connect to apid")
+			logger.Error("could not connect to apid", "err", err)
+
+			return errTalosSetupFailed
 		}
 	} else {
 		// Connect to Talos machined
-		api, err = talosapi.NewLocalSocketClient(ctx, l)
+		var err error
+
+		api, err = talosconnection.MachinedConnection(ctx, logger.With("module", "talosconnection"))
 		if err != nil {
-			l.WithError(err).Fatal("could not connect to machined socket")
+			logger.Error("could not connect to machined socket", "err", err)
+
+			return errTalosSetupFailed
 		}
 	}
 
-	defer func() {
-		if err := api.Close(); err != nil {
-			l.WithError(err).Warn("failed to close API client during process shutdown")
-		}
-	}()
+	hello := fmt.Sprintf("%s © 2020-2025 Oliver Kuckertz, Equinix and Siderolabs", version.Name)
+	logger.Info(hello, "version", version.Tag)
 
-	// Manual test query mode for Talos apid client
-	if talosTestQuery != "" {
-		if err := testQuery(api, talosTestQuery); err != nil {
-			l.WithField("test_query", talosTestQuery).WithError(err).Fatal("test query failed")
-
-			os.Exit(1) //nolint:gocritic
-		}
-
-		os.Exit(0)
-	}
-
-	// Wires up VMware Toolbox commands to Talos apid.
-	vmguestmsg.DefaultLogger = l.WithField("module", "vmware-guestinfo")
-	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair()
-	svc := nanotoolbox.NewService(l, rpcIn, rpcOut)
-	tboxcmds.RegisterGuestInfoCommands(svc, api)
-	tboxcmds.RegisterPowerDelegate(svc, api)
-	tboxcmds.RegisterVixCommand(svc, api)
-
-	// The toolbox service runs and response to RPC requests in the background.
-	if err := svc.Start(); err != nil {
-		l.WithError(err).Fatal("error starting service")
-	}
-
-	// Graceful shutdown on SIGINT/SIGTERM
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
-
-	go func() {
-		l.Debugf("signal: %s", <-sig)
-		ctxCancel()
-		svc.Stop()
-	}()
-	svc.Wait()
-	l.Info("graceful shutdown done, fair winds!")
+	return nil
 }
 
-func testQuery(api *talosapi.LocalClient, query string) error {
-	w := os.Stdout
+func cleanup(_ *cobra.Command, _ []string) error {
+	if err := api.Close(); err != nil {
+		logger.Warn("failed to close API client during process shutdown", "err", err)
 
-	switch query {
-	case "net-interfaces":
-		for idx, intf := range api.NetInterfaces() {
-			for _, addr := range intf.Addrs {
-				_, _ = fmt.Fprintf(w, "%d: name=%s mac=%s addr=%s\n", idx, intf.Name, intf.MAC, addr) //nolint:errcheck
-			}
-		}
+		return err
+	}
 
-		return nil
-	case "hostname":
-		_, _ = fmt.Fprintln(w, api.Hostname()) //nolint:errcheck
+	return nil
+}
 
-		return nil
-	case "os-version":
-		_, _ = fmt.Fprintln(w, api.OSVersion()) //nolint:errcheck
+func init() {
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(`-`, `_`))
+	viper.SetEnvPrefix("vmtoolsd")
 
-		return nil
-	case "os-version-short":
-		_, _ = fmt.Fprintln(w, api.OSVersionShort()) //nolint:errcheck
+	pf := rootCmd.PersistentFlags()
+	pf.Bool(flagUseMachined, false, "use machined unix socket instead of TCP")
+	pf.String(flagTalosConfig, "", "path to talos config file")
+	pf.String(flagTalosNode, "", "talos node to operate on")
+	pf.String(flagLogLevel, "info", "log level (error, warning, info, debug, trace)")
 
-		return nil
-	default:
-		return fmt.Errorf("unknown test query %q", query)
+	if err := viper.BindPFlags(pf); err != nil {
+		panic(err)
+	}
+}
+
+func main() {
+	if err := rootCmd.Execute(); err != nil {
+		panic(err)
 	}
 }

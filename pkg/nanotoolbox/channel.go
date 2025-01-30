@@ -1,21 +1,8 @@
 // This file was adapted from govmomi/toolbox's channel.go and backdoor.go.
 // The original copyright notice follows.
 
-/*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// SPDX-FileCopyrightText: Copyright (c) 2020 Oliver Kuckertz, Siderolabs and Equinix
+// SPDX-License-Identifier: Apache-2.0
 
 // Package nanotoolbox provides a minimal set of tools for communicating with the vmx.
 package nanotoolbox
@@ -24,6 +11,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/vmware/vmw-guestinfo/message"
 	"github.com/vmware/vmw-guestinfo/vmcheck"
@@ -81,11 +69,14 @@ func (c *ChannelOut) Request(request []byte) ([]byte, error) {
 
 type hypervisorChannel struct { //nolint:govet
 	protocol uint32
+	logger   *slog.Logger
 
 	*message.Channel
 }
 
 func (b *hypervisorChannel) Start() error {
+	b.logger.Debug("starting")
+
 	if !vmcheck.IsVirtualCPU() {
 		return ErrNotVirtualWorld
 	}
@@ -101,6 +92,8 @@ func (b *hypervisorChannel) Start() error {
 }
 
 func (b *hypervisorChannel) Stop() error {
+	b.logger.Debug("stopping")
+
 	if b.Channel == nil {
 		return nil
 	}
@@ -113,9 +106,15 @@ func (b *hypervisorChannel) Stop() error {
 }
 
 // NewHypervisorChannelPair returns a pair of channels for communicating with the vmx.
-func NewHypervisorChannelPair() (Channel, Channel) {
-	in := &hypervisorChannel{protocol: tcloProtocol}
-	out := &hypervisorChannel{protocol: rpciProtocol}
+func NewHypervisorChannelPair(logger *slog.Logger) (Channel, Channel) {
+	in := &hypervisorChannel{
+		protocol: tcloProtocol,
+		logger:   logger.With("dir", "in"),
+	}
+	out := &hypervisorChannel{
+		protocol: rpciProtocol,
+		logger:   logger.With("dir", "out"),
+	}
 
 	return in, out
 }
