@@ -9,23 +9,23 @@
     "prHeader": "Update Request | Renovate Bot",
     "packageRules": [
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
             "matchDatasources": [
                 "docker"
             ],
-            "groupName": "container images"
+            "groupName": "container images",
+            "matchPackageNames": [
+                "*"
+            ]
         },
         {
-            "matchPackagePatterns": [
-                "*"
-            ],
             "matchDatasources": [
                 "go",
                 "golang-version"
             ],
-            "groupName": "go packages"
+            "groupName": "go packages",
+            "matchPackageNames": [
+                "*"
+            ]
         }
     ]
 }
