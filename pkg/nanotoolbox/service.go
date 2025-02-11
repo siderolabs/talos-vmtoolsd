@@ -1,31 +1,19 @@
 // This file was adapted from govmomi/toolbox's service.go.
 // The original copyright notice follows.
 
-/*
-Copyright (c) 2017 VMware, Inc. All Rights Reserved.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
+// SPDX-FileCopyrightText: Copyright (c) 2020 Oliver Kuckertz, Siderolabs and Equinix
+// SPDX-License-Identifier: Apache-2.0
 
 package nanotoolbox
 
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"sync"
 	"time"
 
-	"github.com/sirupsen/logrus"
+	"github.com/siderolabs/talos-vmtoolsd/internal/util"
 )
 
 const (
@@ -42,8 +30,8 @@ const (
 
 // Service receives and dispatches incoming RPC requests from the vmx.
 type Service struct { //nolint:govet
-	Log logrus.FieldLogger
-	Out *ChannelOut
+	logger *slog.Logger
+	out    *ChannelOut
 
 	in       Channel
 	name     string
@@ -59,11 +47,11 @@ type Service struct { //nolint:govet
 }
 
 // NewService initializes a Service instance.
-func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service {
+func NewService(log *slog.Logger, rpcIn Channel, rpcOut Channel) *Service {
 	s := &Service{
-		Log: log.WithField("module", "nanotoolbox"),
-		Out: &ChannelOut{rpcOut},
-		in:  rpcIn,
+		logger: log,
+		out:    &ChannelOut{rpcOut},
+		in:     rpcIn,
 
 		name: "toolbox", // same name used by vmtoolsd
 		wg:   new(sync.WaitGroup),
@@ -84,6 +72,13 @@ func NewService(log logrus.FieldLogger, rpcIn Channel, rpcOut Channel) *Service 
 	return s
 }
 
+// Request wraps ChannelOut.Request for demarcation/protection.
+func (s *Service) Request(request []byte) ([]byte, error) {
+	util.TraceLog(s.logger, "requesting", "request", request)
+
+	return s.out.Request(request)
+}
+
 // backoff exponentially increases the RPC poll delay up to maxDelay.
 func (s *Service) backoff() {
 	if s.delay < maxDelay {
@@ -102,7 +97,7 @@ func (s *Service) backoff() {
 
 func (s *Service) stopChannel() {
 	s.in.Stop()  //nolint:errcheck
-	s.Out.Stop() //nolint:errcheck
+	s.out.Stop() //nolint:errcheck
 }
 
 func (s *Service) startChannel() error {
@@ -111,15 +106,17 @@ func (s *Service) startChannel() error {
 		return err
 	}
 
-	return s.Out.Start()
+	return s.out.Start()
 }
 
 func (s *Service) checkReset() error {
 	if s.rpcError {
+		s.logger.Warn("resetting because of rpc error", "err", s.rpcError)
 		s.stopChannel()
 
 		err := s.startChannel()
 		if err != nil {
+			s.logger.Error("error restarting channel", "err", err)
 			s.delay = resetDelay
 
 			return err
@@ -162,9 +159,11 @@ func (s *Service) Start() error {
 				}
 
 				err = s.in.Send(response)
+				util.TraceLog(s.logger, "send", "err", err, "response", string(response))
 				response = nil
 
 				if err != nil {
+					s.logger.Warn("send failed")
 					s.delay = resetDelay
 					s.rpcError = true
 
@@ -172,11 +171,14 @@ func (s *Service) Start() error {
 				}
 
 				request, _ := s.in.Receive() //nolint:errcheck
+				util.TraceLog(s.logger, "received request", "request", string(request))
 
 				if len(request) > 0 {
 					response = s.Dispatch(request)
+					util.TraceLog(s.logger, "response from dispatch", "request", string(request), "response", string(response))
 					s.delay = 0
 				} else {
+					util.TraceLog(s.logger, "backing off")
 					s.backoff()
 				}
 			}
@@ -204,39 +206,42 @@ type OptionHandler func(key, value string)
 
 // AddCapability adds a capability to the Service.
 func (s *Service) AddCapability(name string) {
+	s.logger.Debug("registering capability", "capability", name)
 	s.capabilities = append(s.capabilities, name)
 }
 
 // RegisterCommandHandler adds a CommandHandler to the Service.
 func (s *Service) RegisterCommandHandler(name string, handler CommandHandler) {
+	s.logger.Debug("registering command handler", "command", name)
 	s.commandHandlers[name] = handler
 }
 
 // RegisterOptionHandler adds an OptionHandler to the Service.
 func (s *Service) RegisterOptionHandler(key string, handler OptionHandler) {
+	s.logger.Debug("registering command handler", "option", key)
 	s.optionHandlers[key] = handler
 }
 
 // RegisterResetHandler adds a function to be called when the Service is reset.
 func (s *Service) RegisterResetHandler(f func()) {
+	s.logger.Debug("registering a reset handler")
 	s.resetHandlers = append(s.resetHandlers, f)
 }
 
 // Dispatch an incoming RPC request to a CommandHandler.
 func (s *Service) Dispatch(request []byte) []byte {
+	s.logger.Debug("dispatching", "request", string(request))
 	msg := bytes.SplitN(request, []byte{' '}, 2)
 	name := msg[0]
 
 	// Trim NULL byte terminator
 	name = bytes.TrimRight(name, "\x00")
-	l := s.Log.WithField("handler_name", string(name))
-
-	l.Debug("incoming RPC request")
+	l := s.logger.With("handler_kind", string(name))
 
 	handler, ok := s.commandHandlers[string(name)]
 
 	if !ok {
-		l.Debug("unknown command")
+		l.Debug("unknown command kind")
 
 		return []byte("ERROR Unknown Command")
 	}
@@ -250,7 +255,7 @@ func (s *Service) Dispatch(request []byte) []byte {
 	if err == nil {
 		response = append([]byte("OK "), response...)
 	} else {
-		l.WithError(err).Warn("error calling handler")
+		l.Warn("error calling handler", "err", err)
 
 		response = append([]byte("ERROR "), response...)
 	}
@@ -288,7 +293,7 @@ func (s *Service) HandleSetOption(args []byte) ([]byte, error) {
 // HandleCapabilitiesRegister sends the Service's capabilities to the vmx.
 func (s *Service) HandleCapabilitiesRegister([]byte) ([]byte, error) {
 	for _, capability := range s.capabilities {
-		_, err := s.Out.Request([]byte(capability))
+		_, err := s.Request([]byte(capability))
 		if err != nil {
 			return nil, fmt.Errorf("error sending %q: %w", capability, err)
 		}

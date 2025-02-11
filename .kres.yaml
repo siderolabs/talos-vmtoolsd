@@ -21,6 +21,8 @@ spec:
   copyFrom:
     - stage: extension
   entrypoint: /rootfs/usr/local/lib/containers/talos-vmtoolsd/talos-vmtoolsd
+  entrypointArgs:
+    - vmtoolsd
 ---
 kind: auto.CustomSteps
 spec:

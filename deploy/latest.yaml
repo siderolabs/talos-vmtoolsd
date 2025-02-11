@@ -37,9 +37,11 @@ spec:
               mountPath: /etc/talos-vmtoolsd
               readOnly: true
           env:
-            - name: TALOS_CONFIG_PATH
+            - name: GRPC_ENFORCE_ALPN_ENABLED
+              value: "false"
+            - name: VMTOOLSD_TALOS_CONFIG
               value: /etc/talos-vmtoolsd/talosconfig
-            - name: TALOS_HOST
+            - name: VMTOOLSD_TALOS_NODE
               valueFrom:
                 fieldRef:
                   fieldPath: status.hostIP

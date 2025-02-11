@@ -2,6 +2,7 @@ name: talos-vmtoolsd
 container:
   entrypoint: ./talos-vmtoolsd
   args:
+    - vmtoolsd
     - --use-machined
   mounts:
     - source: /system/run/machined/machine.sock
