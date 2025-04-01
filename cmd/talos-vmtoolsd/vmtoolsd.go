@@ -10,11 +10,9 @@ import (
 	"syscall"
 
 	"github.com/spf13/cobra"
-	vmguestmsg "github.com/vmware/vmw-guestinfo/message"
-	"github.com/vmware/vmw-guestinfo/vmcheck"
 
 	"github.com/siderolabs/talos-vmtoolsd/internal/integration"
-	"github.com/siderolabs/talos-vmtoolsd/internal/vmwlogger"
+	"github.com/siderolabs/talos-vmtoolsd/pkg/hypercall"
 	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
 )
 
@@ -35,18 +33,23 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
 	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
-	if !vmcheck.IsVirtualCPU() {
+	if !hypercall.IsVirtual() {
 		// NB: We cannot simply exit(0) because DaemonSets are always restarted. TODO: or should we? Restarts get noticed, select{} won't
 		logger.Error("halting because the current node is not running under ESXi. fair winds!")
 		select {}
 	}
 
-	// Wires up VMware Toolbox commands to Talos apid.
-	vmlog := vmwlogger.New(logger.With("module", "vmw-guestinfo"))
-	vmguestmsg.DefaultLogger = vmlog
+	rpci, err := nanotoolbox.NewRPCI(logger.With("module", "RPCI"))
+	if err != nil {
+		return err
+	}
 
-	rpcIn, rpcOut := nanotoolbox.NewHypervisorChannelPair(logger.With("module", "nanotoolbox.channel"))
-	svc := nanotoolbox.NewService(logger.With("module", "nanotoolbox.service"), rpcIn, rpcOut)
+	tclo, err := nanotoolbox.NewTCLO(logger.With("module", "TCLO"))
+	if err != nil {
+		return err
+	}
+
+	svc := nanotoolbox.NewService(logger.With("module", "nanotoolbox.service"), rpci, tclo)
 
 	integrations := []integration.Integration{
 		integration.NewPower(logger.With("integration", "power"), api, svc),

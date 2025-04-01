@@ -67,7 +67,8 @@ func setup(cmd *cobra.Command, _ []string) error {
 	}
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, logOpts)).With("command", cmd.Name())
-	ctx, ctxCancel = context.WithCancel(context.Background())
+	ctx = context.Background()
+	ctx, ctxCancel = context.WithCancel(ctx) // nolint:fatcontext
 
 	if !viper.GetBool(flagUseMachined) {
 		// Our spec file passes the secret path and K8s host IP via env vars.

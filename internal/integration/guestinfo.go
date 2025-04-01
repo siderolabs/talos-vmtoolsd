@@ -9,8 +9,7 @@ import (
 	"net/netip"
 	"strconv"
 
-	"github.com/vmware/govmomi/toolbox"
-
+	"github.com/siderolabs/talos-vmtoolsd/internal/nicinfo"
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
 	"github.com/siderolabs/talos-vmtoolsd/internal/util"
 	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
@@ -158,7 +157,7 @@ func (g *GuestInfo) setUptime() {
 // prefixToIAE converts a `netip.Prefix` into a govmomi `IPAddressEntry`.
 // yes, there is a function `AddIP`, but it needs a `net.Addr` that is castable into `net.IPNet`
 // and Talos yields `netip.Prefix`, and it is a pain to convert these.
-func prefixToIAE(p netip.Prefix) toolbox.IPAddressEntry {
+func prefixToIAE(p netip.Prefix) nicinfo.IPAddressEntry {
 	kind := ipAddressEntryV4
 
 	if p.Addr().Is6() {
@@ -166,8 +165,8 @@ func prefixToIAE(p netip.Prefix) toolbox.IPAddressEntry {
 	}
 
 	status := iasPreferred
-	e := toolbox.IPAddressEntry{
-		Address: toolbox.TypedIPAddress{
+	e := nicinfo.IPAddressEntry{
+		Address: nicinfo.TypedIPAddress{
 			Type:    kind,
 			Address: p.Addr().AsSlice(),
 		},
@@ -180,12 +179,12 @@ func prefixToIAE(p netip.Prefix) toolbox.IPAddressEntry {
 
 // setIPAddressV3 fetches the list of nics (name, mac, addresses) ans sets it using XDR encoding.
 func (g *GuestInfo) setIPAddressV3() {
-	info := toolbox.NewGuestNicInfo()
+	info := nicinfo.New()
 
 	// fetch NIC info
 	for _, talosNic := range g.talos.NetInterfaces() {
 		g.logger.Debug("creating NIC entry", "name", talosNic.Name, "mac", talosNic.Mac)
-		nic := toolbox.GuestNicV3{MacAddress: talosNic.Mac}
+		nic := nicinfo.GuestNicV3{MacAddress: talosNic.Mac}
 
 		for _, addr := range talosNic.Addrs {
 			g.logger.Debug("adding IP address", "addr", addr, "nic", talosNic.Name)
@@ -203,10 +202,10 @@ func (g *GuestInfo) setIPAddressV3() {
 	}
 
 	if hostname := g.talos.Hostname(); hostname != "" {
-		info.V3.DNSConfigInfo = &toolbox.DNSConfigInfo{HostName: &hostname}
+		info.V3.DNSConfigInfo = &nicinfo.DNSConfigInfo{HostName: &hostname}
 	}
 
-	infoXDR, err := toolbox.EncodeXDR(info)
+	infoXDR, err := nicinfo.EncodeXDR(info)
 	if err != nil {
 		g.logger.Error("error encoding NIC info to XDR", "err", err)
 

@@ -20,9 +20,22 @@ spec:
     - talos-vmtoolsd.yaml
   copyFrom:
     - stage: extension
+      name: extension
   entrypoint: /rootfs/usr/local/lib/containers/talos-vmtoolsd/talos-vmtoolsd
   entrypointArgs:
     - vmtoolsd
+  extraEnvironment:
+    PLATFORM: linux/amd64,linux/arm64
+---
+kind: golang.Build
+spec:
+  outputs:
+    linux-amd64:
+      GOOS: linux
+      GOARCH: amd64
+    linux-arm64:
+      GOOS: linux
+      GOARCH: arm64
 ---
 kind: auto.CustomSteps
 spec:
