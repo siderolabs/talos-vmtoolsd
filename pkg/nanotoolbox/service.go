@@ -31,9 +31,10 @@ const (
 // Service receives and dispatches incoming RPC requests from the vmx.
 type Service struct { //nolint:govet
 	logger *slog.Logger
-	out    *ChannelOut
 
-	in       Channel
+	tclo *TCLO
+	rpci *RPCI
+
 	name     string
 	stop     chan struct{}
 	wg       *sync.WaitGroup
@@ -47,11 +48,11 @@ type Service struct { //nolint:govet
 }
 
 // NewService initializes a Service instance.
-func NewService(log *slog.Logger, rpcIn Channel, rpcOut Channel) *Service {
+func NewService(log *slog.Logger, r *RPCI, t *TCLO) *Service {
 	s := &Service{
 		logger: log,
-		out:    &ChannelOut{rpcOut},
-		in:     rpcIn,
+		tclo:   t,
+		rpci:   r,
 
 		name: "toolbox", // same name used by vmtoolsd
 		wg:   new(sync.WaitGroup),
@@ -76,7 +77,7 @@ func NewService(log *slog.Logger, rpcIn Channel, rpcOut Channel) *Service {
 func (s *Service) Request(request []byte) ([]byte, error) {
 	util.TraceLog(s.logger, "requesting", "request", request)
 
-	return s.out.Request(request)
+	return s.rpci.Request(request)
 }
 
 // backoff exponentially increases the RPC poll delay up to maxDelay.
@@ -96,17 +97,17 @@ func (s *Service) backoff() {
 }
 
 func (s *Service) stopChannel() {
-	s.in.Stop()  //nolint:errcheck
-	s.out.Stop() //nolint:errcheck
+	s.tclo.Stop() //nolint:errcheck
+	s.rpci.Stop() //nolint:errcheck
 }
 
 func (s *Service) startChannel() error {
-	err := s.in.Start()
+	err := s.tclo.Start()
 	if err != nil {
 		return err
 	}
 
-	return s.out.Start()
+	return s.rpci.Start()
 }
 
 func (s *Service) checkReset() error {
@@ -158,7 +159,7 @@ func (s *Service) Start() error {
 					continue
 				}
 
-				err = s.in.Send(response)
+				err = s.tclo.Send(response)
 				util.TraceLog(s.logger, "send", "err", err, "response", string(response))
 				response = nil
 
@@ -170,7 +171,7 @@ func (s *Service) Start() error {
 					continue
 				}
 
-				request, _ := s.in.Receive() //nolint:errcheck
+				request, _ := s.tclo.Receive() //nolint:errcheck
 				util.TraceLog(s.logger, "received request", "request", string(request))
 
 				if len(request) > 0 {
