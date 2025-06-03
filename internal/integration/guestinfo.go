@@ -9,32 +9,10 @@ import (
 	"net/netip"
 	"strconv"
 
+	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
+
 	"github.com/siderolabs/talos-vmtoolsd/internal/nicinfo"
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
-	"github.com/siderolabs/talos-vmtoolsd/internal/util"
-	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
-)
-
-type guestInfoID int
-
-const (
-	_ guestInfoID = iota
-	// guestInfoDNSName is the guest info kind for the DNS name.
-	guestInfoDNSName
-	_ // IP v1
-	_ // free disk space
-	_ // build number
-	// guestInfoOSNameFull is the guest info kind for the full OS name.
-	guestInfoOSNameFull
-	// guestInfoOSName is the guest info kind for the OS name.
-	guestInfoOSName
-	// guestInfoUptime is the guest uptime in 100s of seconds.
-	guestInfoUptime
-	_ // memory
-	_ // IP v2
-	// guestInfoIPAddressV3 is the guest info kind for the IP address.
-	guestInfoIPAddressV3
-	_ // OS detailed
 )
 
 const (
@@ -47,18 +25,6 @@ const iasPreferred = int32(1) // IAS_PREFERRED
 const unknown = `UNKNOWN`
 
 const maxNICs = 16
-
-var guestInfos = map[guestInfoID]string{
-	guestInfoDNSName:     "DNS name",
-	guestInfoOSNameFull:  "full OS name",
-	guestInfoOSName:      "short OS name",
-	guestInfoUptime:      "uptime",
-	guestInfoIPAddressV3: "IP address",
-}
-
-func (g guestInfoID) Name() string {
-	return guestInfos[g]
-}
 
 // GuestInfo represents the guestinfo integration.
 type GuestInfo struct {
@@ -82,41 +48,31 @@ func NewGuestInfo(logger *slog.Logger, talos *talosconnection.TalosAPIConnection
 
 // functions that send arbitrary commands/info
 
-// setGuestInfo sets a piece of information about the guest, used in a lot of handlers.
-func (g *GuestInfo) setGuestInfo(kind guestInfoID, data []byte) {
-	// NB: intentionally using two spaces as separator to match open-vm-tools
-	l := g.logger.With("guest_info_kind", kind.Name())
-	msg := append([]byte(fmt.Sprintf("SetGuestInfo  %d ", kind)), data...)
-	util.TraceLog(l, "setting", "msg", string(msg))
-
-	if _, err := g.service.Request(msg); err != nil {
-		l.Error("error sending guest info", "err", err)
-	}
-}
-
-// setGuestInfo also sets a piece of information about the guest, but in a different way.
+// setGuestInfo sets guest property.
 func (g *GuestInfo) infoSet(kind string, value string) {
-	l := g.logger.With("info-set_kind", kind)
-	msg := []byte(fmt.Sprintf("info-set %s %s", kind, value))
-	l.With("info-set_kind", kind).Debug("setting", "value", value, "msg", msg)
+	ok, err := g.service.InfoSet(kind, value)
 
-	if _, err := g.service.Request(msg); err != nil {
-		l.Error("error sending guest info", "err", err)
+	g.logger.Debug("received", "ok", ok, "err", err)
+
+	if err != nil {
+		g.logger.Error("error sending guest info", "err", err)
 	}
 }
 
 // convenience wrappers, as they'll get called from different handlers
 
-// setString wraps setGuestInfo, but for strings.
-func (g *GuestInfo) setString(kind guestInfoID, fn func() string) {
-	s := fn()
-	g.logger.With("guest_info_kind", kind.Name()).Debug("setting guestinfo string", "str", s)
-	g.setGuestInfo(kind, []byte(s))
+// setGuestInfoString wraps rpci.SetGuestInfo, but for strings. Less DRY.
+func (g *GuestInfo) setGuestInfoString(kind nanotoolbox.GuestInfoID, fn func() string) {
+	l := g.logger.With("guest_info_kind", kind.String())
+	strVal := fn()
+
+	l.Debug("setting guestinfo string", "str", strVal)
+	g.service.SetGuestInfo(kind, []byte(strVal))
 }
 
 // setDNSName fetches the DNSName from Talos and sets it.
 func (g *GuestInfo) setDNSName() {
-	g.setString(guestInfoDNSName, func() string {
+	g.setGuestInfoString(nanotoolbox.GuestInfoDNSName, func() string {
 		if hostname := g.talos.Hostname(); hostname != "" {
 			return hostname
 		}
@@ -127,7 +83,7 @@ func (g *GuestInfo) setDNSName() {
 
 // setOSNameFull fetches the full OS name/version from Talos and sets it.
 func (g *GuestInfo) setOSNameFull() {
-	g.setString(guestInfoOSNameFull, func() string {
+	g.setGuestInfoString(nanotoolbox.GuestInfoOSNameFull, func() string {
 		if osname := g.talos.OSVersion(); osname != "" {
 			return osname
 		}
@@ -138,7 +94,7 @@ func (g *GuestInfo) setOSNameFull() {
 
 // setOSName fetches the short OS name/version from Talos and sets it.
 func (g *GuestInfo) setOSName() {
-	g.setString(guestInfoOSName, func() string {
+	g.setGuestInfoString(nanotoolbox.GuestInfoOSName, func() string {
 		if osname := g.talos.OSVersionShort(); osname != "" {
 			return osname
 		}
@@ -149,7 +105,7 @@ func (g *GuestInfo) setOSName() {
 
 // setUptime fetches the uptime from Talos and sets it.
 func (g *GuestInfo) setUptime() {
-	g.setString(guestInfoUptime, func() string {
+	g.setGuestInfoString(nanotoolbox.GuestInfoUptime, func() string {
 		return strconv.Itoa(g.talos.Uptime() * 100)
 	})
 }
@@ -214,7 +170,7 @@ func (g *GuestInfo) setIPAddressV3() {
 
 	g.logger.Debug("setting info about nics", "len", len(info.V3.Nics))
 
-	g.setGuestInfo(guestInfoIPAddressV3, infoXDR)
+	g.service.SetGuestInfo(nanotoolbox.GuestInfoIPAddressV3, infoXDR)
 }
 
 // primaryIP using very complex logic to carefully calculate the primary IP address using AI, weighted logic and kittens.
@@ -261,5 +217,5 @@ func (g *GuestInfo) Register() {
 
 	// As stated in guestInfoServer.c, VMX expects uptime information in response
 	// to the capabilities request.
-	g.service.AddCapability(fmt.Sprintf("SetGuestInfo  %d %d", guestInfoUptime, g.talos.Uptime()*100))
+	g.service.AddCapability(fmt.Sprintf("SetGuestInfo  %d %d", nanotoolbox.GuestInfoUptime, g.talos.Uptime()*100))
 }

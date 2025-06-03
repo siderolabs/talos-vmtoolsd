@@ -7,11 +7,11 @@ import (
 	"encoding/base64"
 	"log/slog"
 
+	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
 	"github.com/vmware/govmomi/toolbox/vix"
 
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
 	"github.com/siderolabs/talos-vmtoolsd/internal/version"
-	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
 	"github.com/siderolabs/talos-vmtoolsd/pkg/vixserver"
 )
 
