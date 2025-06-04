@@ -150,7 +150,7 @@ func (g *GuestInfo) setOSName() {
 // setUptime fetches the uptime from Talos and sets it.
 func (g *GuestInfo) setUptime() {
 	g.setString(guestInfoUptime, func() string {
-		return strconv.Itoa(g.talos.Uptime())
+		return strconv.Itoa(g.talos.Uptime() * 100)
 	})
 }
 
@@ -261,5 +261,5 @@ func (g *GuestInfo) Register() {
 
 	// As stated in guestInfoServer.c, VMX expects uptime information in response
 	// to the capabilities request.
-	g.service.AddCapability(fmt.Sprintf("SetGuestInfo  %d %d", guestInfoUptime, g.talos.Uptime()))
+	g.service.AddCapability(fmt.Sprintf("SetGuestInfo  %d %d", guestInfoUptime, g.talos.Uptime()*100))
 }
