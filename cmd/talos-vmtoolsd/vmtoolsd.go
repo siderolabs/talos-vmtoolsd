@@ -9,11 +9,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/equinix-ms/go-vmw-guestrpc/pkg/hypercall"
+	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
 	"github.com/spf13/cobra"
 
 	"github.com/siderolabs/talos-vmtoolsd/internal/integration"
-	"github.com/siderolabs/talos-vmtoolsd/pkg/hypercall"
-	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
 )
 
 var vmtoolsdCmd = &cobra.Command{
@@ -33,7 +33,7 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
 	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
-	if !hypercall.IsVirtual() {
+	if !hypercall.IsVMWareVM() {
 		// NB: We cannot simply exit(0) because DaemonSets are always restarted. TODO: or should we? Restarts get noticed, select{} won't
 		logger.Error("halting because the current node is not running under ESXi. fair winds!")
 		select {}

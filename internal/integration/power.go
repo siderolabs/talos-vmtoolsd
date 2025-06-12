@@ -7,8 +7,9 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
+
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
-	"github.com/siderolabs/talos-vmtoolsd/pkg/nanotoolbox"
 )
 
 // Power represents the power integration (shutdown/reboot/etc.)
