@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/cosi-project/runtime/pkg/safe"
-	"github.com/golang/protobuf/ptypes/empty"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	"github.com/siderolabs/talos/pkg/machinery/resources/network"
 )
@@ -49,7 +49,7 @@ func (c *TalosAPIConnection) OSVersionShort() string {
 
 // Hostname returns the hostname.
 func (c *TalosAPIConnection) Hostname() string {
-	resp, err := c.client.MachineClient.Hostname(c.ctx, &empty.Empty{})
+	resp, err := c.client.MachineClient.Hostname(c.ctx, &emptypb.Empty{})
 	if err != nil || len(resp.Messages) == 0 {
 		c.log.Error("error retrieving hostname", "err", err)
 
@@ -61,7 +61,7 @@ func (c *TalosAPIConnection) Hostname() string {
 
 // Uptime returns the uptime according to Talos in seconds.
 func (c *TalosAPIConnection) Uptime() int {
-	resp, err := c.client.MachineClient.SystemStat(c.ctx, &empty.Empty{})
+	resp, err := c.client.MachineClient.SystemStat(c.ctx, &emptypb.Empty{})
 	if err != nil || len(resp.Messages) == 0 {
 		c.log.Error("error retrieving system stats", "err", err)
 
