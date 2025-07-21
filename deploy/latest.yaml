@@ -52,12 +52,18 @@ spec:
               memory: 64Mi
               cpu: 500m
           securityContext:
+            privileged: false
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
-            runAsUser: 1002
-            runAsGroup: 1002
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop:
+                - all
+              add:
+                - SYS_RAWIO # Override with SKIP_VMWARE_DETECTION
       securityContext:
-        fsGroup: 1002
+        fsGroup: 0
       volumes:
         - name: config
           secret:

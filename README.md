@@ -56,7 +56,9 @@ Install or upgrade `talos-vmtoolsd`:
 kubectl apply --filename https://raw.githubusercontent.com/siderolabs/talos-vmtoolsd/master/deploy/latest.yaml
 ```
 
-Remember
+The `CAP_SYS_RAWIO` capability is used to perform a check to determine whether the environment is VMware.
+This check can be skipped by setting env var `SKIP_VMWARE_DETECTION=true`.
+Note that `Segmentation fault` will be produced if the environment is **not** VMware.
 
 ## Talos Compatibility Matrix
 
