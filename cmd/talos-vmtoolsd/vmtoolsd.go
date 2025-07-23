@@ -7,12 +7,14 @@ import (
 	"errors"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/equinix-ms/go-vmw-guestrpc/pkg/hypercall"
 	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
 	"github.com/spf13/cobra"
 
+	"github.com/siderolabs/talos-vmtoolsd/internal/capcheck"
 	"github.com/siderolabs/talos-vmtoolsd/internal/integration"
 )
 
@@ -33,10 +35,34 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
 	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
-	if !hypercall.IsVMWareVM() {
-		// NB: We cannot simply exit(0) because DaemonSets are always restarted. TODO: or should we? Restarts get noticed, select{} won't
-		logger.Error("halting because the current node is not running under ESXi. fair winds!")
-		select {}
+	// SKIP_VMWARE_DETECTION allows bypassing detection, thus avoiding the CAP_SYS_RAWIO requirement.
+	var skipVMwareDetection bool
+
+	if val, err := strconv.ParseBool(os.Getenv("SKIP_VMWARE_DETECTION")); err != nil {
+		logger.Info("SKIP_VMWARE_DETECTION defaulting to false.")
+
+		skipVMwareDetection = false
+	} else {
+		skipVMwareDetection = val
+	}
+
+	if !skipVMwareDetection {
+		// CAP_SYS_RAWIO bit = 17
+		err := capcheck.CheckCapabilities(17)
+		if err != nil {
+			logger.Error("halting during CAP_SYS_RAWIO check", "err", err)
+
+			select {}
+		}
+
+		if !hypercall.IsVMWareVM() {
+			// NB: We cannot simply exit(0) because DaemonSets are always restarted. TODO: or should we? Restarts get noticed, select{} won't
+			logger.Error("halting because the current node is not running under ESXi. fair winds!")
+
+			select {}
+		}
+	} else {
+		logger.Info("skipping VMware environment detection")
 	}
 
 	rpci, err := nanotoolbox.NewRPCI(logger.With("module", "RPCI"))
@@ -77,6 +103,7 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 		ctxCancel()
 		svc.Stop()
 	}()
+
 	svc.Wait()
 	logger.Info("graceful shutdown done, fair winds!")
 
