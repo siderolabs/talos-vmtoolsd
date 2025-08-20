@@ -5,17 +5,22 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 
 	"github.com/equinix-ms/go-vmw-guestrpc/pkg/hypercall"
 	"github.com/equinix-ms/go-vmw-guestrpc/pkg/nanotoolbox"
 	"github.com/spf13/cobra"
+	"github.com/spf13/viper"
 
 	"github.com/siderolabs/talos-vmtoolsd/internal/capcheck"
 	"github.com/siderolabs/talos-vmtoolsd/internal/integration"
+)
+
+const (
+	flagSkipVmwareDetection = "skip-vmware-detection"
 )
 
 var vmtoolsdCmd = &cobra.Command{
@@ -28,6 +33,13 @@ var vmtoolsdCmd = &cobra.Command{
 var errVMToolsdStartFailed = errors.New("error starting vmtoolsd")
 
 func init() {
+	pf := vmtoolsdCmd.PersistentFlags()
+	pf.Bool(flagSkipVmwareDetection, false, "skip vmware detection")
+
+	if err := viper.BindPFlags(pf); err != nil {
+		panic(err)
+	}
+
 	rootCmd.AddCommand(vmtoolsdCmd)
 }
 
@@ -35,31 +47,25 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
 	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.
-	// SKIP_VMWARE_DETECTION allows bypassing detection, thus avoiding the CAP_SYS_RAWIO requirement.
-	var skipVMwareDetection bool
-
-	if val, err := strconv.ParseBool(os.Getenv("SKIP_VMWARE_DETECTION")); err != nil {
-		logger.Info("SKIP_VMWARE_DETECTION defaulting to false.")
-
-		skipVMwareDetection = false
-	} else {
-		skipVMwareDetection = val
-	}
-
-	if !skipVMwareDetection {
-		// CAP_SYS_RAWIO bit = 17
-		err := capcheck.CheckCapabilities(17)
+	// VMTOOLSD_SKIP_VMWARE_DETECTION allows bypassing detection, thus avoiding the CAP_SYS_RAWIO requirement.
+	if !viper.GetBool(flagSkipVmwareDetection) {
+		hascap, err := capcheck.HasCapability(capcheck.CapSysRawio)
 		if err != nil {
-			logger.Error("halting during CAP_SYS_RAWIO check", "err", err)
+			logger.Error("error checking capabilities", "err", err)
 
-			select {}
+			return err
+		}
+
+		if !hascap {
+			logger.Error("we lack CAP_SYS_RAWIO and cannot check safely if we are running in VMWare")
+
+			return fmt.Errorf("lacking capabilities")
 		}
 
 		if !hypercall.IsVMWareVM() {
-			// NB: We cannot simply exit(0) because DaemonSets are always restarted. TODO: or should we? Restarts get noticed, select{} won't
-			logger.Error("halting because the current node is not running under ESXi. fair winds!")
+			logger.Error("we are not running under VMWare/ESXi. bailing out!")
 
-			select {}
+			return fmt.Errorf("not running under VMWare/ESXi")
 		}
 	} else {
 		logger.Info("skipping VMware environment detection")
