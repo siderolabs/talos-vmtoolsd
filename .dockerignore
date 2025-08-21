@@ -1,6 +1,6 @@
 # THIS FILE WAS AUTOMATICALLY GENERATED, PLEASE DO NOT EDIT.
 #
-# Generated on 2025-05-27T14:25:30Z by kres 9f64b0d.
+# Generated on 2025-08-21T13:38:59Z by kres 6262116.
 
 *
 !cmd
@@ -9,7 +9,7 @@
 !go.mod
 !go.sum
 !.golangci.yml
+!HACKING.md
 !README.md
 !.markdownlint.json
-!manifest.yaml
-!talos-vmtoolsd.yaml
+!hack/govulncheck.sh
