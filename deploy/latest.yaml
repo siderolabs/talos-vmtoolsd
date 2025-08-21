@@ -61,7 +61,7 @@ spec:
               drop:
                 - all
               add:
-                - SYS_RAWIO # Override with SKIP_VMWARE_DETECTION
+                - SYS_RAWIO # Overrideenvironments/equinix/hieradata/nodes/Linux/vpn01-am3-mcl.yaml with VMTOOLSD_SKIP_VMWARE_DETECTION
       securityContext:
         fsGroup: 0
       volumes:

@@ -57,7 +57,7 @@ kubectl apply --filename https://raw.githubusercontent.com/siderolabs/talos-vmto
 ```
 
 The `CAP_SYS_RAWIO` capability is used to perform a check to determine whether the environment is VMware.
-This check can be skipped by setting env var `SKIP_VMWARE_DETECTION=true`.
+This check can be skipped by setting env var `VMTOOLSD_SKIP_VMWARE_DETECTION=true`.
 Note that `Segmentation fault` will be produced if the environment is **not** VMware.
 
 ## Talos Compatibility Matrix

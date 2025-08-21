@@ -11,34 +11,34 @@ import (
 	"strings"
 )
 
-// CheckCapabilities checks natively if a given LINUX capability is granted
+// HasCapability checks natively if a given LINUX capability is granted
 // Capability (position) is in bits, only for reference
 // https://pkg.go.dev/github.com/syndtr/gocapability/capability#pkg-constants
-func CheckCapabilities(capabilityBit int8) error {
+func HasCapability(capabilityBit int8) (bool, error) {
 	procStatus, err := os.ReadFile("/proc/self/status")
 	if err != nil {
-		return fmt.Errorf("error reading /proc/self/status: %w", err)
+		return false, fmt.Errorf("error reading /proc/self/status: %w", err)
 	}
 
 	for _, line := range strings.Split(string(procStatus), "\n") {
 		if strings.HasPrefix(line, "CapEff:") {
 			parts := strings.Fields(line)
 			if len(parts) < 2 {
-				return fmt.Errorf("invalid CapEff line format")
+				return false, fmt.Errorf("invalid CapEff line format")
 			}
 			// read as hexadecimal number (base 16).
 			val, err := strconv.ParseUint(parts[1], 16, 64)
 			if err != nil {
-				return fmt.Errorf("error parsing CapEff value: %w", err)
+				return false, fmt.Errorf("error parsing CapEff value: %w", err)
 			}
 			// Create bitmask and bitwise to determine if capability (as decicmal) is set
 			if val&(1<<capabilityBit) != 0 {
-				return nil
+				return true, nil
 			}
 
-			return fmt.Errorf("capability (%v) is not granted inside current environment", capabilityBit)
+			return false, nil
 		}
 	}
 
-	return fmt.Errorf("capEff line not found")
+	return false, fmt.Errorf("capEff line not found")
 }
