@@ -14,14 +14,6 @@ spec:
 ---
 kind: common.Image
 spec:
-  additionalImages: []
-  allowedLocalPaths:
-    - manifest.yaml
-    - talos-vmtoolsd.yaml
-  copyFrom:
-    - stage: extension
-      name: extension
-  entrypoint: /rootfs/usr/local/lib/containers/talos-vmtoolsd/talos-vmtoolsd
   entrypointArgs:
     - vmtoolsd
   extraEnvironment:
@@ -36,26 +28,4 @@ spec:
     linux-arm64:
       GOOS: linux
       GOARCH: arm64
----
-kind: auto.CustomSteps
-spec:
-  steps:
-    - name: extension
-      toplevel: true
----
-kind: custom.Step
-name: extension
-spec:
-  docker:
-    enabled: true
-    stages:
-      - name: extension
-        description: copies the required files for the extension
-        steps:
-          - copy:
-              src: manifest.yaml
-              dst: /
-          - copy:
-              src: talos-vmtoolsd.yaml
-              dst: /rootfs/usr/local/etc/containers/talos-vmtoolsd.yaml
 ---
