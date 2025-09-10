@@ -10,8 +10,7 @@ Deploying this program on your Talos cluster provides native integration of Talo
 ## Installation as a Talos System Extension
 
 The preferred use is as a [System Extension](https://www.talos.dev/latest/talos-guides/configuration/system-extensions/).
-Please refer to the Talos documentation on how to build [Boot Assets](https://www.talos.dev/latest/talos-guides/install/boot-assets/#imager)
-that include `talos-vmtoolsd`.
+Please refer to the Talos documentation on how to build [Boot Assets](https://www.talos.dev/latest/talos-guides/install/boot-assets/#imager) that include `talos-vmtoolsd`.
 
 Basically, for a node upgrade, it boils down to something like this:
 
@@ -20,7 +19,7 @@ Basically, for a node upgrade, it boils down to something like this:
 docker run --rm --tty \
     --volume $PWD/_out:/out ghcr.io/siderolabs/imager:<talos version> \
     installer \
-    --system-extension-image ghcr.io/siderolabs/talos-vmtoolsd:<talos vmtoolsd version>
+    --system-extension-image ghcr.io/siderolabs/vmtoolsd-guest-agent:<talos vmtoolsd version>
 
 # Push the installer image as a container to your registry
 crane push _out/installer-amd64.tar ghcr.io/<username></username>/talos-installer:<talos version>
@@ -29,6 +28,10 @@ crane push _out/installer-amd64.tar ghcr.io/<username></username>/talos-installe
 talosctl upgrade --nodes <node ip> \
     --image ghcr.io/<username></username>/talos-installer:<talos version>
 ```
+
+Note: until version v1.2.0 this repository built a dual purpose image: besides packaging the tool (ie: for a `DaemonSet`), it was also a system extension by itself.
+As of version v1.3.0, this repo builds a single purpose image that cannot be used as a Talos extension.
+To use it as a extension, it needs conversion, which is done by [siderolabs/extensions](https://github.com/siderolabs/extensions).
 
 ## Installation as a DaemonSet
 
@@ -62,17 +65,20 @@ Note that `Segmentation fault` will be produced if the environment is **not** VM
 
 ## Talos Compatibility Matrix
 
-Please find an [older version of this matrix](https://github.com/siderolabs/talos-vmtoolsd/blob/0.4.0/README.md)
-for compatibility with older Talos and vmtoolsd-verions.
+We do not regulary test vmtoolsd versions against all Talos versions, but you can safely assume latest vmtoolsd release always works with latest talos.
+Also, the version of vmtoolsd that is shipped by [image factory](https://factory.talos.dev) should work.
 
-| ⬇️ Tools \ Talos ➡️ |  1.5 | 1.6 | 1.7 | 1.8 | 1.9 |
+There have been incompatibilies in the past, which is why we created a small compatibility matrix.
+
+Please find an [older version of this matrix](https://github.com/siderolabs/talos-vmtoolsd/blob/0.4.0/README.md) for compatibility with older Talos and vmtoolsd-verions.
+
+| ⬇️ Tools \ Talos ➡️ |  1.5 | 1.6 | 1.7 | 1.8 | >= 1.9 |
 | ------------------ | --- | ----| --- | ---- | --- |
-| **1.0** (current)  |  ⚠️   |  ⚠️  |  ⚠️  |  ⚠️  | ✅  |
+| **>=1.0**          |  ⚠️   |  ⚠️  |  ⚠️  |  ⚠️  | ✅  |
 | **0.6**            |  ✅  | ✅  | ✅  | ✅  | ⚠️  |
 | **0.5**            |  ✅  | ✅  |     |     |    |
 
-Talos 1.8+ carries gRPC >= 1.67, which [has issues with older gRPC](https://github.com/siderolabs/talos/issues/9463),
-and causes gRPC errors like these:
+Talos 1.8+ carries gRPC >= 1.67, which [has issues with older gRPC](https://github.com/siderolabs/talos/issues/9463), and causes gRPC errors like these:
 
 ```text
 rpc error: code = Unavailable desc = connection error: desc = \"transport: authentication handshake failed: credentials: cannot check peer: missing selected ALPN property\"
@@ -99,9 +105,7 @@ The standard open-vm-tools package in a container has multiple shortcomings unde
 
 1. It wants a shutdown binary, but there is none that works properly with Talos.
 2. Its out-of-band process and file management goes against Talos' immutability principle.
-3. Exposing virtual network adapters to vSphere can cause issues like described in the
-   [VMware CPI documentation](https://cloud-provider-vsphere.sigs.k8s.io/known_issues.html).
-   No workarounds are necessary for talos-vmtoolsd.
+3. Exposing virtual network adapters to vSphere can cause issues like described in the [VMware CPI documentation](https://cloud-provider-vsphere.sigs.k8s.io/known_issues.html) (no workarounds are necessary for talos-vmtoolsd).
 
 The standard open-vm-tools package expects to run on the host and have some program (e.g. `/usr/bin/shutdown`) to handle shutdown requests.
 Running open-vm-tools in a privileged container may work, but it provides mediocre results with Talos.
