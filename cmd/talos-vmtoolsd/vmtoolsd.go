@@ -62,9 +62,23 @@ func vmtoolsd(_ *cobra.Command, _ []string) error {
 			return fmt.Errorf("lacking capabilities")
 		}
 
-		if !hypercall.IsVMWareVM() {
-			logger.Error("we are not running under VMWare/ESXi. bailing out!")
+		isVMwareVM, err := hypercall.IsVMWareVM()
+		switch {
+		case errors.Is(err, hypercall.ErrSetPivilegeLevel) && api.SecureBootEnabled():
+			// If secure boot is enabled, we can ignore `ErrSetPivilegeLevel` but
+			// we still need to check IsVirtual()
+			logger.Info("running with secure boot; ignoring privilege level error")
 
+			isVirtual, err2 := hypercall.IsVirtual()
+			switch {
+			case err2 != nil:
+				return err2
+			case !isVirtual:
+				return fmt.Errorf("we are not running in a virtual machine")
+			}
+		case err != nil:
+			return err
+		case !isVMwareVM:
 			return fmt.Errorf("not running under VMWare/ESXi")
 		}
 	} else {

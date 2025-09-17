@@ -4,7 +4,7 @@ go 1.24.4
 
 require (
 	github.com/cosi-project/runtime v1.10.7
-	github.com/equinix-ms/go-vmw-guestrpc v0.1.1
+	github.com/equinix-ms/go-vmw-guestrpc v1.0.0
 	github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93
 	github.com/siderolabs/talos v1.10.6
 	github.com/siderolabs/talos/pkg/machinery v1.10.6
@@ -22,6 +22,7 @@ require (
 	github.com/ProtonMail/gopenpgp/v2 v2.9.0 // indirect
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
+	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
 	github.com/containerd/go-cni v1.1.13 // indirect
