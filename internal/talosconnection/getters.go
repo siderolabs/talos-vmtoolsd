@@ -11,6 +11,7 @@ import (
 	"github.com/cosi-project/runtime/pkg/safe"
 	"github.com/siderolabs/talos/pkg/machinery/api/machine"
 	"github.com/siderolabs/talos/pkg/machinery/resources/network"
+	"github.com/siderolabs/talos/pkg/machinery/resources/runtime"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
@@ -119,4 +120,16 @@ func (c *TalosAPIConnection) NetInterfaces() (result []NetInterface) {
 	}
 
 	return result
+}
+
+// SecureBootEnabled checks if secure boot is enabled on this machine.
+func (c *TalosAPIConnection) SecureBootEnabled() bool {
+	securityState, err := safe.StateGetByID[*runtime.SecurityState](c.ctx, c.client.COSI, "securitystate")
+	if err != nil {
+		c.log.Error("error getting security state", "err", err)
+
+		return false
+	}
+
+	return securityState.TypedSpec().SecureBoot
 }
