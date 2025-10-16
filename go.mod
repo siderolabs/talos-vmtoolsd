@@ -3,16 +3,16 @@ module github.com/siderolabs/talos-vmtoolsd
 go 1.24.4
 
 require (
-	github.com/cosi-project/runtime v1.10.7
+	github.com/cosi-project/runtime v1.11.0
 	github.com/equinix-ms/go-vmw-guestrpc v1.0.0
 	github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93
-	github.com/siderolabs/talos v1.10.6
-	github.com/siderolabs/talos/pkg/machinery v1.10.6
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/viper v1.20.1
+	github.com/siderolabs/talos v1.11.3
+	github.com/siderolabs/talos/pkg/machinery v1.11.3
+	github.com/spf13/cobra v1.10.1
+	github.com/spf13/viper v1.21.0
 	github.com/vmware/govmomi v0.52.0
-	google.golang.org/grpc v1.75.0
-	google.golang.org/protobuf v1.36.7
+	google.golang.org/grpc v1.76.0
+	google.golang.org/protobuf v1.36.10
 )
 
 require (
