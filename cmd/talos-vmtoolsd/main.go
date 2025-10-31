@@ -25,6 +25,7 @@ const (
 	flagLogLevel    = "log-level"
 	flagTalosConfig = "talos-config"
 	flagTalosNode   = "talos-node"
+	flagRPCCmd      = "cmd"
 )
 
 var rootCmd = &cobra.Command{
@@ -33,6 +34,13 @@ var rootCmd = &cobra.Command{
 	Long:               "this is a tool like open-vm-tools, but for Talos Linux",
 	PersistentPreRunE:  setup,
 	PersistentPostRunE: cleanup,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if viper.IsSet(flagRPCCmd) {
+			return executeRPC(viper.GetString(flagRPCCmd))
+		}
+
+		return cmd.Help()
+	},
 }
 
 var errTalosSetupFailed = errors.New("error setting up Talos connection")
@@ -68,6 +76,12 @@ func setup(cmd *cobra.Command, _ []string) error {
 	}
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, logOpts)).With("command", cmd.Name())
+
+	if viper.IsSet(flagRPCCmd) || cmd.Name() == "rpc" {
+		// no need to configure talos api client in that case.
+		return nil
+	}
+
 	ctx = context.Background()
 	ctx, ctxCancel = context.WithCancel(ctx) // nolint:fatcontext
 
@@ -115,10 +129,12 @@ func setup(cmd *cobra.Command, _ []string) error {
 }
 
 func cleanup(_ *cobra.Command, _ []string) error {
-	if err := api.Close(); err != nil {
-		logger.Warn("failed to close API client during process shutdown", "err", err)
+	if api != nil {
+		if err := api.Close(); err != nil {
+			logger.Warn("failed to close API client during process shutdown", "err", err)
 
-		return err
+			return err
+		}
 	}
 
 	return nil
@@ -134,6 +150,7 @@ func init() {
 	pf.String(flagTalosConfig, "", "path to talos config file")
 	pf.String(flagTalosNode, "", "talos node to operate on")
 	pf.String(flagLogLevel, "info", "log level (error, warning, info, debug, trace)")
+	pf.String(flagRPCCmd, "", "RPC command for the hypvervisor")
 
 	if err := viper.BindPFlags(pf); err != nil {
 		panic(err)
