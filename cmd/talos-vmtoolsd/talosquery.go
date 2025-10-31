@@ -20,7 +20,14 @@ func init() {
 	rootCmd.AddCommand(talosqueryCmd)
 }
 
-func talosquery(_ *cobra.Command, _ []string) {
+func talosquery(cmd *cobra.Command, _ []string) {
+	err := setupTalosClient()
+	if err != nil {
+		logger.Error("error while setting up the Talos API client", "err", err)
+
+		return
+	}
+
 	logger.Info("hostname", "dnsname", api.Hostname())
 	logger.Info("os information", "version", api.OSVersion(), "short", api.OSVersionShort())
 	u := api.Uptime()

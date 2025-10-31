@@ -43,7 +43,13 @@ func init() {
 	rootCmd.AddCommand(vmtoolsdCmd)
 }
 
-func vmtoolsd(_ *cobra.Command, _ []string) error {
+func vmtoolsd(cmd *cobra.Command, _ []string) error {
+	if err := setupTalosClient(); err != nil {
+		logger.Error("error while setting up the Talos API client")
+
+		return err
+	}
+
 	// Simplify deployment to mixed vSphere and non-vSphere clusters by detecting ESXi and stopping
 	// early for other platforms. Admins can avoid the overhead of this idle process by labeling
 	// all ESXi/vSphere nodes and editing talos-vmtoolsd's DaemonSet to run only on those nodes.

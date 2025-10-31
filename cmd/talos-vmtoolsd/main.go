@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 
+	"github.com/siderolabs/talos-vmtoolsd/internal/rpc"
 	"github.com/siderolabs/talos-vmtoolsd/internal/talosconnection"
 	"github.com/siderolabs/talos-vmtoolsd/internal/version"
 )
@@ -33,6 +34,18 @@ var rootCmd = &cobra.Command{
 	Long:               "this is a tool like open-vm-tools, but for Talos Linux",
 	PersistentPreRunE:  setup,
 	PersistentPostRunE: cleanup,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if viper.IsSet(flagRPCCommand) {
+			err := rpc.ExecuteRPC(logger, viper.GetString(flagRPCCommand))
+			if err != nil {
+				os.Exit(1)
+			}
+
+			return nil
+		}
+
+		return cmd.Help()
+	},
 }
 
 var errTalosSetupFailed = errors.New("error setting up Talos connection")
@@ -68,6 +81,11 @@ func setup(cmd *cobra.Command, _ []string) error {
 	}
 
 	logger = slog.New(slog.NewTextHandler(os.Stdout, logOpts)).With("command", cmd.Name())
+
+	return nil
+}
+
+func setupTalosClient() error {
 	ctx = context.Background()
 	ctx, ctxCancel = context.WithCancel(ctx) // nolint:fatcontext
 
@@ -115,10 +133,12 @@ func setup(cmd *cobra.Command, _ []string) error {
 }
 
 func cleanup(_ *cobra.Command, _ []string) error {
-	if err := api.Close(); err != nil {
-		logger.Warn("failed to close API client during process shutdown", "err", err)
+	if api != nil {
+		if err := api.Close(); err != nil {
+			logger.Warn("failed to close API client during process shutdown", "err", err)
 
-		return err
+			return err
+		}
 	}
 
 	return nil
@@ -134,6 +154,7 @@ func init() {
 	pf.String(flagTalosConfig, "", "path to talos config file")
 	pf.String(flagTalosNode, "", "talos node to operate on")
 	pf.String(flagLogLevel, "info", "log level (error, warning, info, debug, trace)")
+	pf.String(flagRPCCommand, "", "RPC command for the hypvervisor")
 
 	if err := viper.BindPFlags(pf); err != nil {
 		panic(err)
