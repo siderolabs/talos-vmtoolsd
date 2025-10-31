@@ -36,7 +36,7 @@ var rootCmd = &cobra.Command{
 	PersistentPostRunE: cleanup,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if viper.IsSet(flagRPCCmd) {
-			return rpcCommand(cmd, args)
+			return executeRPC(viper.GetString(flagRPCCmd))
 		}
 
 		return cmd.Help()

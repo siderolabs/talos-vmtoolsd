@@ -12,7 +12,7 @@ import (
 
 var rpcCmd = &cobra.Command{
 	Use:   "rpc --cmd [command]",
-	Short: "execute an arbitraty RPC command",
+	Short: "execute an arbitrary RPC command",
 	Long:  "can be used to query the hypervisor with e.g. 'info-get guestinfo.some-metadata'",
 	RunE:  rpcCommand,
 }
@@ -24,14 +24,26 @@ func init() {
 	rootCmd.AddCommand(rpcCmd)
 }
 
-func rpcCommand(cmd *cobra.Command, _ []string) error {
+func rpcCommand(_ *cobra.Command, _ []string) error {
+	err := executeRPC(rpcCommandFlag)
+
+	return err
+}
+
+func executeRPC(command string) error {
+	if command == "" {
+		return fmt.Errorf("RPC command cannot be empty")
+	}
+
+	logger.Debug("executing RPC command", "command", command)
+
 	rpci, err := nanotoolbox.NewRPCI(logger.With("module", "RPCI"))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create RPCI: %w", err)
 	}
 
 	if err = rpci.Start(); err != nil {
-		logger.Error("error starting rpci service", "err", err)
+		return fmt.Errorf("failed to start RPCI channel: %w", err)
 	}
 
 	defer func() {
@@ -40,14 +52,18 @@ func rpcCommand(cmd *cobra.Command, _ []string) error {
 		}
 	}()
 
-	result, ok, err := rpci.Request([]byte(rpcCommandFlag))
+	result, ok, err := rpci.Request([]byte(command))
 	if err != nil {
 		return fmt.Errorf("RPC request failed: %w", err)
 	}
 
 	if !ok {
-		return fmt.Errorf("RPC request failed (!ok). response: %v", result)
+		logger.Error("RPC returned error", "response", string(result))
+
+		return fmt.Errorf("RPC command failed: %s", string(result))
 	}
+
+	logger.Debug("RPC command successful", "response", string(result))
 
 	if len(result) > 0 {
 		fmt.Println(string(result))
