@@ -20,7 +20,7 @@ func HasCapability(capabilityBit int8) (bool, error) {
 		return false, fmt.Errorf("error reading /proc/self/status: %w", err)
 	}
 
-	for _, line := range strings.Split(string(procStatus), "\n") {
+	for line := range strings.SplitSeq(string(procStatus), "\n") {
 		if strings.HasPrefix(line, "CapEff:") {
 			parts := strings.Fields(line)
 			if len(parts) < 2 {

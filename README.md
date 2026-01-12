@@ -72,11 +72,11 @@ There have been incompatibilies in the past, which is why we created a small com
 
 Please find an [older version of this matrix](https://github.com/siderolabs/talos-vmtoolsd/blob/0.4.0/README.md) for compatibility with older Talos and vmtoolsd-verions.
 
-| ⬇️ Tools \ Talos ➡️ |  1.5 | 1.6 | 1.7 | 1.8 | >= 1.9 |
-| ------------------ | --- | ----| --- | ---- | --- |
-| **>=1.0**          |  ⚠️   |  ⚠️  |  ⚠️  |  ⚠️  | ✅  |
-| **0.6**            |  ✅  | ✅  | ✅  | ✅  | ⚠️  |
-| **0.5**            |  ✅  | ✅  |     |     |    |
+| ⬇️ Tools \ Talos ➡️ | 1.5 | 1.6 | 1.7 | 1.8 | >= 1.9 |
+| ----------------- | --- | --- | --- | --- | ------ |
+| **>=1.0** | ⚠️ | ⚠️ | ⚠️ | ⚠️ | ✅ |
+| **0.6** | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| **0.5** | ✅ | ✅ | | | |
 
 Talos 1.8+ carries gRPC >= 1.67, which [has issues with older gRPC](https://github.com/siderolabs/talos/issues/9463), and causes gRPC errors like these:
 
