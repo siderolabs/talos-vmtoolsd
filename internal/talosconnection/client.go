@@ -40,7 +40,8 @@ func RemoteApidConnection(ctx context.Context, logger *slog.Logger, configPath s
 
 	logger.Debug("setting up talos connection to apid", "configfile", configPath, "node", node)
 
-	client, err := talosclient.New(ctx,
+	client, err := talosclient.New(
+		ctx,
 		talosclient.WithConfig(cfg),
 		talosclient.WithEndpoints(node),
 	)
@@ -65,7 +66,8 @@ func MachinedConnection(ctx context.Context, logger *slog.Logger) (*TalosAPIConn
 	authz.SetMetadata(md, talosrole.MakeSet(talosrole.Admin))
 	adminCtx := metadata.NewOutgoingContext(ctx, md)
 
-	client, err := talosclient.New(adminCtx,
+	client, err := talosclient.New(
+		adminCtx,
 		talosclient.WithUnixSocket(talosconstants.MachineSocketPath),
 		talosclient.WithGRPCDialOptions(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	)
