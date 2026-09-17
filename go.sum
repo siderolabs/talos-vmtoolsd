@@ -133,8 +133,12 @@ github.com/siderolabs/protoenc v0.2.4 h1:D3Fpn2nQSQOhl8ZlAxijZAf7K6F8CM1uZq0afIG
 github.com/siderolabs/protoenc v0.2.4/go.mod h1:i5XLHjfv5vyi7LhQrSEo19HCA+lYtDd7CWxsoWp9XE8=
 github.com/siderolabs/talos v1.14.0 h1:A1RIiEj4jObjRsZB5HC/KDmKokhU4pXsvixD+57czKw=
 github.com/siderolabs/talos v1.14.0/go.mod h1:1QtvU+kWmeTs36e/Qf1NzAyQryD1d4tXLJLJkg1ANnM=
+github.com/siderolabs/talos v1.14.1 h1:hBTn0gwcy0WK6gHsijCtHZCED1BtzA3Wh3w41NL6s3s=
+github.com/siderolabs/talos v1.14.1/go.mod h1:aeAzK7vI2g3gY8fB9Y6SH4f84jztTW2oK78+E0yyqko=
 github.com/siderolabs/talos/pkg/machinery v1.14.0 h1:wVaf0IZhJLaOsr8OHvYR8RTDN4Gh9qqStd904eM5RlE=
 github.com/siderolabs/talos/pkg/machinery v1.14.0/go.mod h1:8rhGLm+Se7X/VnTG6InEhagg7zCDUFRwfJjLcqGNw7w=
+github.com/siderolabs/talos/pkg/machinery v1.14.1 h1:dh2PkMNUkndQWSY+iUy9d9rGDKpAD9TuHylzVhY544Y=
+github.com/siderolabs/talos/pkg/machinery v1.14.1/go.mod h1:PEzCUOIG+87NIqBsONm/eQEQQfgoOwWL+r5ANhCrQGU=
 github.com/spf13/afero v1.15.0 h1:b/YBCLWAJdFWJTN9cLhiXXcD7mzKn9Dm86dNnfyQw1I=
 github.com/spf13/afero v1.15.0/go.mod h1:NC2ByUVxtQs4b3sIUphxK0NioZnmxgyCrfzeuq8lxMg=
 github.com/spf13/cast v1.10.0 h1:h2x0u2shc1QuLHfxi+cTJvs30+ZAHOGRic8uyGTDWxY=
@@ -204,6 +208,8 @@ google.golang.org/genproto/googleapis/rpc v0.0.0-20260911204522-f61a6ca850bd h1:
 google.golang.org/genproto/googleapis/rpc v0.0.0-20260911204522-f61a6ca850bd/go.mod h1:DjtHYE8FKJLivXcBEjGwndXfIC23G0VpXiXKqG179uA=
 google.golang.org/grpc v1.83.2 h1:EManeRomTObA0BU7I8vXgg/78uE5MJ9M8B39EX2WscU=
 google.golang.org/grpc v1.83.2/go.mod h1:YPI1hK3kDked6iHvgX3tR0y+nX/qpMFKhPgFsokw1S8=
+google.golang.org/grpc v1.84.0 h1:soMyaPJ8pAak5PIQ0DGBUir0XRo2fRoMqhNWMLlLxO0=
+google.golang.org/grpc v1.84.0/go.mod h1:ljCht0DrxQrXBDRTZp52Qxh3Ffk8CdYm2sj4O2QN2C0=
 google.golang.org/protobuf v1.36.12 h1:pJOKDDOyeXErUroCihFAd5LQuwXBSpVnKGrj5o/fwxc=
 google.golang.org/protobuf v1.36.12/go.mod h1:HTf+CrKn2C3g5S8VImy6tdcUvCska2kB7j23XfzDpco=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=

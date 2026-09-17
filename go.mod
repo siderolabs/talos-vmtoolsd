@@ -6,12 +6,12 @@ require (
 	github.com/cosi-project/runtime v1.16.3
 	github.com/equinix-ms/go-vmw-guestrpc v1.0.0
 	github.com/rasky/go-xdr v0.0.0-20170124162913-1a41d1a06c93
-	github.com/siderolabs/talos v1.14.0
-	github.com/siderolabs/talos/pkg/machinery v1.14.0
+	github.com/siderolabs/talos v1.14.1
+	github.com/siderolabs/talos/pkg/machinery v1.14.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
 	github.com/vmware/govmomi v0.56.0
-	google.golang.org/grpc v1.83.2
+	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
 )
 
